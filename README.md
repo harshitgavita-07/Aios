@@ -89,6 +89,8 @@ This project is a demonstration of on-device intelligence, showing how modern LL
 You can connect with me and explore more of my work here:
 
 GitHub: https://github.com/harshitgavita-07
+
 LinkedIn / Portfolio: www.linkedin.com/in/harshit-gavita-bb90b3202
 
 Feel free to fork this repository, open issues, or suggest new features to make this offline assistant even more powerful and user-friendly.
+
