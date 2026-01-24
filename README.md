@@ -32,25 +32,29 @@ A floating bubble sits on top of your desktop; click it to open a chat window an
 Follow these steps to run the assistant on your PC or laptop.
 
 1. **Clone the repository**
+   
    (bash)
    git clone https://github.com/harshitgavita-07/Aios.git
 
 
 2.Enter the project folder
+
 (Bash)
 cd Aios
 
 3. Create a virtual environment
-(bash)
 
+(bash)
 python -m venv venv
 
 4.Activate the virtual environment
+
 Windows (PowerShell):
 (bash)
 venv\Scripts\Activate
 
-macOS / Linux (bash):
+macOS / Linux :
+(bash)
 source venv/bin/activate
 
 5.Install dependencies
@@ -93,4 +97,5 @@ GitHub: https://github.com/harshitgavita-07
 LinkedIn / Portfolio: www.linkedin.com/in/harshit-gavita-bb90b3202
 
 Feel free to fork this repository, open issues, or suggest new features to make this offline assistant even more powerful and user-friendly.
+
 
