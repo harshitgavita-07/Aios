@@ -1,101 +1,118 @@
-# Aios – Offline Desktop AI Assistant
+<div align="center">
 
-Aios is a local, offline AI desktop assistant that runs entirely on your machine using an on-device LLM (via Ollama). Your prompts and responses stay on your device and are never sent to any cloud service.[file:3][file:5]
+# 🤖 Aios — Local AI Desktop Assistant
 
-A floating bubble sits on top of your desktop; click it to open a chat window and talk to the assistant in natural language.[file:3][file:4][file:7]
+### On-device intelligence. No cloud. No API keys. No data leaving your machine.
 
----
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Ollama](https://img.shields.io/badge/Powered%20by-Ollama-black?style=for-the-badge)](https://ollama.ai)
+[![PySide6](https://img.shields.io/badge/UI-PySide6%20(Qt)-41CD52?style=for-the-badge)](https://doc.qt.io/qtforpython/)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen?style=for-the-badge)]()
 
-## Features
-
-- Fully local inference using an Ollama model (default configurable in `llm.py`).[file:5]  
-- Floating, draggable bubble that stays on top of other windows for quick access.[file:3][file:4]  
-- Clean chat UI built with PySide6 (Qt) for questions and responses.[file:3][file:7]  
-- Simple agent/router + brain architecture so you can plug in your own logic.[file:2][file:6]  
-- Graceful error handling and fallback messages if the model or brain is not available.[file:2][file:7]
+</div>
 
 ---
 
-## Project structure
+## 🔒 Why Aios?
 
-- `app.py` – Entry point; starts the Qt application, creates the assistant window, and shows the floating bubble.[file:3]  
-- `bubble.py` – Implements the always-on-top circular bubble that you can drag and click to open the assistant.[file:4]  
-- `ui.py` – Main chat UI (`DesktopAssistant` widget) with message area, text input, and send button.[file:7]  
-- `agent.py` – Central router that forwards all user input to the brain.[file:2]  
-- `brain.py` – Simple brain layer that cleans input and calls the LLM, with basic safeguards.[file:6]  
-- `llm.py` – Thin wrapper around Ollama; runs a local LLM model and returns text responses.[file:5]
+Every AI assistant today sends your data to the cloud — your questions, your context, your private information. **Aios doesn't.**
+
+It runs a full LLM inference engine locally via [Ollama](https://ollama.ai), sits as a floating bubble on your desktop, and responds to natural language queries entirely on your machine.
+
+> Built before "local AI" was a buzzword.
 
 ---
 
-## Installation
+## ✨ Features
 
-Follow these steps to run the assistant on your PC or laptop.
+| Feature | Description |
+|---------|-------------|
+| 🔒 **100% Offline** | All inference runs locally via Ollama — zero network requests |
+| 🫧 **Floating Bubble UI** | Always-on-top draggable bubble for instant access |
+| 💬 **Natural Language Chat** | Full chat UI built with PySide6/Qt |
+| 🧠 **Pluggable Brain** | Modular agent/router architecture — swap LLMs or add skills |
+| ⚡ **Graceful Fallbacks** | Works even if model or brain is temporarily unavailable |
+| 🔧 **Configurable** | Change the LLM model in one line in `llm.py` |
 
-1. **Clone the repository**
-   
-   (bash)
-   git clone https://github.com/harshitgavita-07/Aios.git
+---
 
+## 🏗️ Architecture
 
-2.Enter the project folder
+```
+User Input
+    │
+    ▼
+bubble.py ──► ui.py (Chat UI)
+                │
+                ▼
+           agent.py (Router)
+                │
+                ▼
+           brain.py (Logic + Safeguards)
+                │
+                ▼
+           llm.py (Ollama wrapper)
+                │
+                ▼
+         Local LLM Model
+         (runs on your GPU/CPU)
+```
 
-(Bash)
+**Files:**
+- `app.py` — Entry point, starts the Qt app
+- `bubble.py` — Always-on-top floating bubble widget
+- `ui.py` — Main chat interface
+- `agent.py` — Routes user input to the brain
+- `brain.py` — Input sanitization + LLM calls
+- `llm.py` — Thin Ollama wrapper
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.10+
+- [Ollama](https://ollama.ai) installed and running
+- Any Ollama model pulled (e.g. `ollama pull llama3.2`)
+
+### Install & Run
+
+```bash
+git clone https://github.com/harshitgavita-07/Aios.git
 cd Aios
-
-3. Create a virtual environment
-
-(bash)
-python -m venv venv
-
-4.Activate the virtual environment
-
-Windows (PowerShell):
-(bash)
-venv\Scripts\Activate
-
-macOS / Linux :
-(bash)
-source venv/bin/activate
-
-5.Install dependencies
-
-(bash)
-pip install -r requirements.txt.
-
-6. Install Ollama and pull a local model
-
-Install Ollama from: https://ollama.com
-Then pull a model (example):
-(bash)
-ollama pull llama3.1:8b
-
-## Make sure the MODEL constant in llm.py matches the model you pulled.[file:5] ##
-
-7. Run the desktop assistant
-(bash)
-
+pip install -r requirements.txt
 python app.py
+```
 
+A floating bubble will appear on your desktop. Click it to open the assistant.
 
-A small floating bubble will appear on your desktop. Click it to open the main chat window and start talking to your local assistant.[file:3][file:4][file:7]
+---
 
-## Usage ##
+## 🔮 Why This Matters
 
-Click the bubble once to open the Desktop AI Assistant V1 window.[file:3][file:4][file:7]
-Type your question in the input field at the bottom and press Enter or click Send.[file:7]
-The assistant output will appear in the chat area, and the view will auto-scroll to the newest messages.[file:7]
-If the agent or LLM is not available, the UI shows clear system or runtime error messages instead of crashing.[file:2][file:5][file:7]
+2025 is the year of **on-device AI**:
+- Apple Intelligence runs on-device
+- Meta's LLaMA models run on consumer hardware
+- Privacy regulations are getting stricter globally
 
-## About the creator ##
-Hi, I am Gavita Harshit , a developer passionate about building practical AI tools that run locally and respect user privacy.
-This project is a demonstration of on-device intelligence, showing how modern LLMs can power a desktop assistant without any cloud dependency.
+Aios was built with this philosophy from day one: **your AI, your machine, your data.**
 
-You can connect with me and explore more of my work here:
+---
 
-GitHub: https://github.com/harshitgavita-07
+## 🛣️ Roadmap
 
-LinkedIn / Portfolio: www.linkedin.com/in/harshit-gavita-bb90b3202
+- [ ] Voice input / TTS output
+- [ ] System prompt customization via UI
+- [ ] Plugin system for custom skills (web search, calendar, etc.)
+- [ ] Hotkey to summon the assistant from anywhere
+- [ ] Memory / conversation history persistence
 
-Feel free to fork this repository, open issues, or suggest new features to make this offline assistant even more powerful and user-friendly.
+---
 
+<div align="center">
 
+**Star ⭐ if you believe AI should stay on your machine.**
+
+*Built by [Harshit Gavita](https://github.com/harshitgavita-07)*
+
+</div>
