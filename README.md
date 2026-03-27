@@ -29,10 +29,12 @@ It runs a full LLM inference engine locally via [Ollama](https://ollama.ai), sit
 |---------|-------------|
 | 🔒 **100% Offline** | All inference runs locally via Ollama — zero network requests |
 | 🫧 **Floating Bubble UI** | Always-on-top draggable bubble for instant access |
-| 💬 **Natural Language Chat** | Full chat UI built with PySide6/Qt |
+| 💬 **Streaming Chat** | Real-time token-by-token display with typing indicator |
+| 🖥️ **Hardware-Aware** | Auto-detects GPU/VRAM and picks the best model for your machine |
+| ⚡ **Non-blocking UI** | LLM runs in a background thread — the interface never freezes |
+| ⚙️ **Settings Panel** | Switch models, download new ones, tune performance — all from the UI |
 | 🧠 **Pluggable Brain** | Modular agent/router architecture — swap LLMs or add skills |
-| ⚡ **Graceful Fallbacks** | Works even if model or brain is temporarily unavailable |
-| 🔧 **Configurable** | Change the LLM model in one line in `llm.py` |
+| 🔧 **Autotune** | Optional Ollama autotune and pyaccelerate integration for speed profiles |
 
 ---
 
@@ -42,29 +44,47 @@ It runs a full LLM inference engine locally via [Ollama](https://ollama.ai), sit
 User Input
     │
     ▼
-bubble.py ──► ui.py (Chat UI)
+bubble.py ──► ui.py (Chat UI + Streaming + Typing Indicator)
+                │               ▲
+                │               │ token_received / generation_finished
+                ▼               │
+           worker.py (QThread) ─┘
                 │
                 ▼
-           agent.py (Router)
+           brain.py (Logic)
                 │
                 ▼
-           brain.py (Logic + Safeguards)
+           llm.py (Ollama SDK — chat + streaming)
                 │
                 ▼
-           llm.py (Ollama wrapper)
+         hardware.py (GPU/CPU detection + model recommendation)
                 │
                 ▼
-         Local LLM Model
+         Local LLM via Ollama
          (runs on your GPU/CPU)
+
+  ┌─────────────────────────────┐
+  │  settings.py (⚙ Settings)  │
+  │  • Auto/Manual model select │
+  │  • Model catalog & download │
+  │  • Performance profiles     │
+  │  • pyaccelerate install     │
+  └─────────────────────────────┘
 ```
 
 **Files:**
-- `app.py` — Entry point, starts the Qt app
-- `bubble.py` — Always-on-top floating bubble widget
-- `ui.py` — Main chat interface
-- `agent.py` — Routes user input to the brain
-- `brain.py` — Input sanitization + LLM calls
-- `llm.py` — Thin Ollama wrapper
+
+| File | Purpose |
+|------|---------|
+| `app.py` | Entry point — launches QApplication, Bubble, and DesktopAssistant |
+| `bubble.py` | Floating always-on-top draggable bubble widget |
+| `ui.py` | Main chat window with streaming display, typing animation, and settings |
+| `worker.py` | QThread wrapper — runs LLM inference without blocking the UI |
+| `brain.py` | Input processing → LLM orchestration |
+| `agent.py` | Router layer — future plugins (web search, calendar) plug in here |
+| `llm.py` | Ollama SDK wrapper — `ollama.chat()` with streaming and model management |
+| `hardware.py` | GPU/VRAM/CPU/RAM detection with model recommendation tiers |
+| `settings.py` | Settings panel — model selector, download catalog, performance profiles |
 
 ---
 
@@ -86,11 +106,47 @@ python app.py
 
 A floating bubble will appear on your desktop. Click it to open the assistant.
 
+### Optional: Enhanced Hardware Profiling
+
+```bash
+pip install pyaccelerate
+```
+
+When installed, Aios uses pyaccelerate for richer GPU detection — architecture, CUDA cores, memory type, bandwidth, PCIe info, NVENC/NVDEC, and more.
+
+---
+
+## 🖥️ Hardware-Aware Model Selection
+
+Aios automatically detects your hardware at startup and picks the best model from what you have installed:
+
+| VRAM Budget | Recommended Models |
+|-------------|-------------------|
+| ≤ 4 GB | `llama3.2:1b`, `phi3:mini`, `gemma2:2b` |
+| ≤ 6 GB | `llama3.2:3b`, `phi3:3.8b`, `qwen2.5:3b` |
+| ≤ 10 GB | `llama3.1:8b`, `gemma3:12b`, `mistral:7b` |
+| ≤ 16 GB | `llama3.1:8b`, `qwen2.5:14b`, `deepseek-r1:14b` |
+| ≤ 24 GB | `qwen2.5:32b`, `deepseek-r1:32b` |
+| 24+ GB | `llama3.1:70b`, `qwen2.5:72b` |
+
+No GPU? Aios falls back to CPU-only mode with a small model.
+
+---
+
+## ⚙️ Settings Panel
+
+Click the ⚙ gear icon in the chat window to access:
+
+- **Model Mode** — Auto (hardware-detected) or Manual selection
+- **Download Models** — Searchable catalog of 18+ popular models with installed/available icons
+- **Performance Profiles** — speed, balanced, memory, multiuser (via Ollama autotune API)
+- **pyaccelerate Install** — One-click install with approval dialog
+
 ---
 
 ## 🔮 Why This Matters
 
-2025 is the year of **on-device AI**:
+2025–2026 is the era of **on-device AI**:
 - Apple Intelligence runs on-device
 - Meta's LLaMA models run on consumer hardware
 - Privacy regulations are getting stricter globally
