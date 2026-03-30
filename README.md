@@ -1,40 +1,32 @@
+# 🤖 AIOS v2.0 — Local AI Runtime
+
 <div align="center">
 
-# 🤖 Aios — Local AI Desktop Assistant
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
+[![Ollama](https://img.shields.io/badge/Powered%20by-Ollama-000000?style=flat)](https://ollama.ai)
+[![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?style=flat)](https://doc.qt.io/qtforpython/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](LICENSE)
 
-### On-device intelligence. No cloud. No API keys. No data leaving your machine.
-
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Ollama](https://img.shields.io/badge/Powered%20by-Ollama-black?style=for-the-badge)](https://ollama.ai)
-[![PySide6](https://img.shields.io/badge/UI-PySide6%20(Qt)-41CD52?style=for-the-badge)](https://doc.qt.io/qtforpython/)
-[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen?style=for-the-badge)]()
+**Your personal AI runtime. Agent system, memory, emotion, and tool execution — entirely on your machine.**
 
 </div>
 
 ---
 
-## 🔒 Why Aios?
+## ✨ What is AIOS?
 
-Every AI assistant today sends your data to the cloud — your questions, your context, your private information. **Aios doesn't.**
+AIOS is a **local-first AI runtime** that transforms your desktop into an intelligent agent system. Unlike cloud-based assistants, AIOS runs entirely on your machine — your data never leaves your computer.
 
-It runs a full LLM inference engine locally via [Ollama](https://ollama.ai), sits as a floating bubble on your desktop, and responds to natural language queries entirely on your machine.
-
-> Built before "local AI" was a buzzword.
-
----
-
-## ✨ Features
+### Key Capabilities
 
 | Feature | Description |
 |---------|-------------|
-| 🔒 **100% Offline** | All inference runs locally via Ollama — zero network requests |
-| 🫧 **Floating Bubble UI** | Always-on-top draggable bubble for instant access |
-| 💬 **Streaming Chat** | Real-time token-by-token display with typing indicator |
-| 🖥️ **Hardware-Aware** | Auto-detects GPU/VRAM and picks the best model for your machine |
-| ⚡ **Non-blocking UI** | LLM runs in a background thread — the interface never freezes |
-| ⚙️ **Settings Panel** | Switch models, download new ones, tune performance — all from the UI |
-| 🧠 **Pluggable Brain** | Modular agent/router architecture — swap LLMs or add skills |
-| 🔧 **Autotune** | Optional Ollama autotune and pyaccelerate integration for speed profiles |
+| 🧠 **Agent System** | Intent detection, planning, and task execution |
+| 💾 **Persistent Memory** | SQLite-based conversation history across sessions |
+| 😊 **SoulSync** | Emotional intelligence and tone adaptation |
+| 🔧 **Tool Execution** | Whitelist-based system tools (calculator, files, system info) |
+| ⚡ **Streaming** | Real-time token-by-token response display |
+| 🖥️ **Hardware-Aware** | Auto-detects GPU/VRAM, optimizes model selection |
 
 ---
 
@@ -44,131 +36,204 @@ It runs a full LLM inference engine locally via [Ollama](https://ollama.ai), sit
 User Input
     │
     ▼
-bubble.py ──► ui.py (Chat UI + Streaming + Typing Indicator)
-                │               ▲
-                │               │ token_received / generation_finished
-                ▼               │
-           worker.py (QThread) ─┘
-                │
-                ▼
-           brain.py (Logic)
-                │
-                ▼
-           llm.py (Ollama SDK — chat + streaming)
-                │
-                ▼
-         hardware.py (GPU/CPU detection + model recommendation)
-                │
-                ▼
-         Local LLM via Ollama
-         (runs on your GPU/CPU)
-
-  ┌─────────────────────────────┐
-  │  settings.py (⚙ Settings)  │
-  │  • Auto/Manual model select │
-  │  • Model catalog & download │
-  │  • Performance profiles     │
-  │  • pyaccelerate install     │
-  └─────────────────────────────┘
+┌─────────────────┐
+│  AgentController│ ← Main orchestrator
+└────────┬────────┘
+         │
+    ┌────┴────┬────────┬────────┐
+    ▼         ▼        ▼        ▼
+┌──────┐  ┌──────┐ ┌──────┐ ┌──────┐
+│Memory │  │SoulSync│ │Planner│ │ Tools │
+│Store  │  │(Emotion)│ │       │ │       │
+└──┬───┘  └───────┘ └───┬───┘ └───┬───┘
+   │                    │         │
+   └────────────────────┴─────────┘
+                      │
+                      ▼
+               ┌──────────┐
+               │  LLM     │ ← Ollama (local)
+               │  Client  │
+               └────┬─────┘
+                    │
+                    ▼
+            Streaming Response
+                    │
+                    ▼
+              ┌──────────┐
+              │  Chat UI │ ← PySide6 (modern dark theme)
+              │ (bubble) │
+              └──────────┘
 ```
 
-**Files:**
+### Module Breakdown
 
-| File | Purpose |
-|------|---------|
-| `app.py` | Entry point — launches QApplication, Bubble, and DesktopAssistant |
-| `bubble.py` | Floating always-on-top draggable bubble widget |
-| `ui.py` | Main chat window with streaming display, typing animation, and settings |
-| `worker.py` | QThread wrapper — runs LLM inference without blocking the UI |
-| `brain.py` | Input processing → LLM orchestration |
-| `agent.py` | Router layer — future plugins (web search, calendar) plug in here |
-| `llm.py` | Ollama SDK wrapper — `ollama.chat()` with streaming and model management |
-| `hardware.py` | GPU/VRAM/CPU/RAM detection with model recommendation tiers |
-| `settings.py` | Settings panel — model selector, download catalog, performance profiles |
+| Module | Purpose |
+|--------|---------|
+| `core/agent.py` | AgentController — main orchestrator |
+| `core/memory.py` | SQLite conversation persistence |
+| `core/soulsync.py` | Emotion detection & tone adaptation |
+| `core/planner.py` | Intent detection & task planning |
+| `core/llm.py` | Ollama client with caching |
+| `tools/executor.py` | Whitelist-based tool execution |
+| `tools/system_tools.py` | Built-in system tools |
+| `ui/chat_ui.py` | Modern PySide6 interface |
+| `ui/bubble.py` | Floating quick-access bubble |
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.10+
-- [Ollama](https://ollama.ai) installed and running
-- Any Ollama model pulled (e.g. `ollama pull llama3.2`)
 
-### Install & Run
+- **Python 3.10+**
+- **[Ollama](https://ollama.ai)** installed and running
+- Any Ollama model pulled (e.g., `ollama pull llama3.2`)
+
+### Installation
 
 ```bash
+# Clone the repository
 git clone https://github.com/harshitgavita-07/Aios.git
 cd Aios
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Run AIOS
 python app.py
 ```
 
-A floating bubble will appear on your desktop. Click it to open the assistant.
+A floating bubble will appear on your desktop. Click it to open the assistant window.
 
-### Optional: Enhanced Hardware Profiling
+---
 
-```bash
-pip install pyaccelerate
-```
+## 💻 Usage
 
-When installed, Aios uses pyaccelerate for richer GPU detection — architecture, CUDA cores, memory type, bandwidth, PCIe info, NVENC/NVDEC, and more.
+### Chat Interface
+
+The main window features:
+- **Left Panel**: Conversation history and thread management
+- **Center Panel**: Chat display with streaming responses
+- **Right Panel**: System status and quick actions
+- **Bottom**: Input field with command support
+
+### Commands
+
+Type `/help` in the chat for available commands:
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/clear` | Clear current conversation |
+| `/status` | Show system status |
+| `/memory` | Show memory statistics |
+
+### Floating Bubble
+
+- **Click**: Open chat window
+- **Drag**: Reposition anywhere on screen
+- **Always on top**: Access from any application
 
 ---
 
 ## 🖥️ Hardware-Aware Model Selection
 
-Aios automatically detects your hardware at startup and picks the best model from what you have installed:
+AIOS automatically detects your hardware and recommends the optimal model:
 
-| VRAM Budget | Recommended Models |
-|-------------|-------------------|
+| VRAM | Recommended Models |
+|------|-------------------|
 | ≤ 4 GB | `llama3.2:1b`, `phi3:mini`, `gemma2:2b` |
 | ≤ 6 GB | `llama3.2:3b`, `phi3:3.8b`, `qwen2.5:3b` |
-| ≤ 10 GB | `llama3.1:8b`, `gemma3:12b`, `mistral:7b` |
-| ≤ 16 GB | `llama3.1:8b`, `qwen2.5:14b`, `deepseek-r1:14b` |
+| ≤ 10 GB | `llama3.1:8b`, `mistral:7b`, `qwen2.5:7b` |
+| ≤ 16 GB | `qwen2.5:14b`, `deepseek-r1:14b` |
 | ≤ 24 GB | `qwen2.5:32b`, `deepseek-r1:32b` |
 | 24+ GB | `llama3.1:70b`, `qwen2.5:72b` |
 
-No GPU? Aios falls back to CPU-only mode with a small model.
+---
+
+## 🔧 Tool System
+
+AIOS includes sandboxed tools for safe system interaction:
+
+| Tool | Description |
+|------|-------------|
+| `think` | Structured reasoning step |
+| `calculator` | Safe mathematical evaluation |
+| `file_read` | Read files (restricted directories) |
+| `file_write` | Write files (restricted directories) |
+| `list_directory` | Browse directories |
+| `system_info` | Hardware and system information |
+
+**Security**: All tools are **whitelisted** — only registered, approved tools can execute. File operations are restricted to `~/Documents`, `~/Downloads`, and `~/Desktop`.
 
 ---
 
-## ⚙️ Settings Panel
+## 🧠 SoulSync (Emotional Intelligence)
 
-Click the ⚙ gear icon in the chat window to access:
+SoulSync analyzes your messages for emotional content and adapts the AI's tone:
 
-- **Model Mode** — Auto (hardware-detected) or Manual selection
-- **Download Models** — Searchable catalog of 18+ popular models with installed/available icons
-- **Performance Profiles** — speed, balanced, memory, multiuser (via Ollama autotune API)
-- **pyaccelerate Install** — One-click install with approval dialog
+**Detected Emotions**: joy, anger, sadness, fear, surprise, confusion, urgency, neutral
+
+**Tone Adaptations**:
+- **Joy** → Enthusiastic, casual
+- **Anger** → Calm, soothing
+- **Confusion** → Patient, technical
+- **Urgency** → Direct, concise
+
+Your emotional patterns and user profile persist across sessions in `data/user_profile.json`.
 
 ---
 
-## 🔮 Why This Matters
+## 🗂️ Memory System
 
-2025–2026 is the era of **on-device AI**:
-- Apple Intelligence runs on-device
-- Meta's LLaMA models run on consumer hardware
-- Privacy regulations are getting stricter globally
+Conversations are stored in `data/aios_memory.db`:
 
-Aios was built with this philosophy from day one: **your AI, your machine, your data.**
+- **Persistent threads**: Multiple conversation contexts
+- **Message history**: Last 20 messages in context window
+- **Metadata tracking**: Tool calls, emotions, timestamps
+- **Searchable**: Query past conversations
 
 ---
 
 ## 🛣️ Roadmap
 
+- [x] Agent system with intent detection
+- [x] Persistent memory (SQLite)
+- [x] Emotional intelligence (SoulSync)
+- [x] Tool execution system
+- [x] Modern PySide6 UI
 - [ ] Voice input / TTS output
-- [ ] System prompt customization via UI
-- [ ] Plugin system for custom skills (web search, calendar, etc.)
-- [ ] Hotkey to summon the assistant from anywhere
-- [ ] Memory / conversation history persistence
+- [ ] Custom tool creation API
+- [ ] Plugin/extension system
+- [ ] Hotkey activation
+- [ ] Model fine-tuning support
+- [ ] Multi-agent collaboration
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Areas of interest:
+
+- **New tools**: File operations, web scraping (local), API integrations
+- **UI improvements**: Themes, accessibility, animations
+- **Core features**: Multi-agent, tool creation API
+- **Documentation**: Tutorials, examples, architecture guides
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## 📄 License
+
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
 <div align="center">
 
-**Star ⭐ if you believe AI should stay on your machine.**
+**Built with ❤️ for the local AI community**
 
-*Built by [Harshit Gavita](https://github.com/harshitgavita-07)*
+*Star ⭐ if you believe AI should stay on your machine*
 
 </div>
