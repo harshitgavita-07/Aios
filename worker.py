@@ -1,14 +1,17 @@
 """
-Aios LLM worker — runs inference in a QThread so the UI never blocks.
+Aios LLM worker — runs agent processing in a QThread so the UI never blocks.
+
+v2: routes through the agent controller (memory + soulsync + planner + LLM)
+instead of calling the LLM directly.
 """
 
 from PySide6.QtCore import QThread, Signal
 
-from llm import ask_llm_stream
+from core.agent import process as agent_process
 
 
 class LLMWorker(QThread):
-    """Background thread that streams LLM tokens back to the UI."""
+    """Background thread that streams agent tokens back to the UI."""
 
     token_received = Signal(str)
     generation_finished = Signal()
@@ -20,7 +23,7 @@ class LLMWorker(QThread):
 
     def run(self):
         try:
-            for token in ask_llm_stream(self.prompt):
+            for token in agent_process(self.prompt):
                 self.token_received.emit(token)
             self.generation_finished.emit()
         except Exception as e:
