@@ -16,6 +16,9 @@ from PySide6.QtCore import Qt, QTimer
 from llm import init as llm_init, get_model, get_hw_info
 from worker import LLMWorker
 from settings import SettingsPanel
+from core import memory
+from core.agent import new_session
+from core.soulsync import emotion_label
 
 
 class DesktopAssistant(QWidget):
@@ -59,6 +62,13 @@ class DesktopAssistant(QWidget):
         self._settings_panel.model_changed.connect(self._on_model_changed)
         self._settings_panel.hide()
 
+        # Emotion status indicator
+        self.soul_label = QLabel("mood: neutral")
+        self.soul_label.setStyleSheet(
+            "color: #4b5563; font-size: 10px; padding: 2px 4px;"
+        )
+        root.addWidget(self.soul_label)
+
         # Chat display
         self.chat = QTextEdit()
         self.chat.setReadOnly(True)
@@ -92,6 +102,19 @@ class DesktopAssistant(QWidget):
             "QPushButton:disabled { background: #374151; color: #6b7280; }"
         )
         input_row.addWidget(self.send_btn)
+
+        # Clear chat button
+        self.clear_btn = QPushButton("✕")
+        self.clear_btn.setFixedSize(32, 32)
+        self.clear_btn.setToolTip("Clear chat / new session")
+        self.clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.clear_btn.setStyleSheet(
+            "QPushButton { background: transparent; color: #6b7280; "
+            "border: 1px solid #374151; border-radius: 6px; font-size: 13px; } "
+            "QPushButton:hover { background: #374151; color: #f3f4f6; }"
+        )
+        self.clear_btn.clicked.connect(self._clear_chat)
+        input_row.addWidget(self.clear_btn)
 
         root.addLayout(input_row)
         self.setLayout(root)
@@ -128,6 +151,19 @@ class DesktopAssistant(QWidget):
         self._set_busy(True)
         self._first_token = False
         self._start_typing_indicator()
+
+        # Update emotion indicator
+        emotion = emotion_label(text)
+        _mood_colors = {
+            "neutral": "#4b5563", "curious": "#3b82f6",
+            "happy": "#22c55e", "excited": "#f59e0b",
+            "frustrated": "#ef4444", "anxious": "#a78bfa",
+        }
+        color = _mood_colors.get(emotion, "#4b5563")
+        self.soul_label.setStyleSheet(
+            f"color: {color}; font-size: 10px; padding: 2px 4px;"
+        )
+        self.soul_label.setText(f"mood: {emotion}")
 
         self._worker = LLMWorker(text)
         self._worker.token_received.connect(self._on_token)
@@ -208,9 +244,19 @@ class DesktopAssistant(QWidget):
         )
         self.chat.append(f"\n🔄 Model switched to: {model}\n")
 
+    def _clear_chat(self):
+        new_session()
+        self.chat.clear()
+        self.soul_label.setText("mood: neutral")
+        self.soul_label.setStyleSheet(
+            "color: #4b5563; font-size: 10px; padding: 2px 4px;"
+        )
+        self.chat.append("🤖 New session started.\n")
+
     def _set_busy(self, busy: bool):
         self.input.setEnabled(not busy)
         self.send_btn.setEnabled(not busy)
         self.settings_btn.setEnabled(not busy)
+        self.clear_btn.setEnabled(not busy)
         if not busy:
             self.input.setFocus()
