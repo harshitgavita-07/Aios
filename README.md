@@ -1,239 +1,213 @@
-# 🤖 AIOS v2.0 — Local AI Runtime
+# AIOS
 
-<div align="center">
+**A local-first AI runtime with reasoning, memory, and research capabilities.**
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
-[![Ollama](https://img.shields.io/badge/Powered%20by-Ollama-000000?style=flat)](https://ollama.ai)
-[![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?style=flat)](https://doc.qt.io/qtforpython/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](LICENSE)
-
-**Your personal AI runtime. Agent system, memory, emotion, and tool execution — entirely on your machine.**
-
-</div>
+```
+┌─────────────────────────────────────────────┐
+│  Your machine. Your data. Your AI.           │
+│  No cloud. No API keys. No compromises.      │
+└─────────────────────────────────────────────┘
+```
 
 ---
 
-## ✨ What is AIOS?
+## What It Does
 
-AIOS is a **local-first AI runtime** that transforms your desktop into an intelligent agent system. Unlike cloud-based assistants, AIOS runs entirely on your machine — your data never leaves your computer.
+AIOS transforms your desktop into an intelligent agent system:
 
-### Key Capabilities
-
-| Feature | Description |
-|---------|-------------|
-| 🧠 **Agent System** | Intent detection, planning, and task execution |
-| 💾 **Persistent Memory** | SQLite-based conversation history across sessions |
-| 😊 **SoulSync** | Emotional intelligence and tone adaptation |
-| 🔧 **Tool Execution** | Whitelist-based system tools (calculator, files, system info) |
-| ⚡ **Streaming** | Real-time token-by-token response display |
-| 🖥️ **Hardware-Aware** | Auto-detects GPU/VRAM, optimizes model selection |
+| Capability | What You Can Do |
+|------------|-----------------|
+| **Chat** | Natural conversations with persistent memory |
+| **Research** | "What's the latest news about..." — real-time web search + RAG |
+| **Execute** | Run calculations, file operations, system commands |
+| **Reason** | Complex analysis with step-by-step thinking |
 
 ---
 
-## 🏗️ Architecture
+## Quick Start
+
+```bash
+# Clone and setup
+git clone https://github.com/harshitgavita-07/Aios.git
+cd Aios
+pip install -r requirements.txt
+
+# Run
+python app.py
+```
+
+A floating bubble appears. Click to open.
+
+---
+
+## Architecture
 
 ```
 User Input
     │
     ▼
 ┌─────────────────┐
-│  AgentController│ ← Main orchestrator
+│  Mode Controller│  → Detect: Chat / Research / Execute / Reason
 └────────┬────────┘
          │
-    ┌────┴────┬────────┬────────┐
-    ▼         ▼        ▼        ▼
-┌──────┐  ┌──────┐ ┌──────┐ ┌──────┐
-│Memory │  │SoulSync│ │Planner│ │ Tools │
-│Store  │  │(Emotion)│ │       │ │       │
-└──┬───┘  └───────┘ └───┬───┘ └───┬───┘
-   │                    │         │
-   └────────────────────┴─────────┘
-                      │
-                      ▼
-               ┌──────────┐
-               │  LLM     │ ← Ollama (local)
-               │  Client  │
-               └────┬─────┘
+    ┌────┴────┬──────────┬─────────┐
+    ▼         ▼          ▼         ▼
+┌──────┐  ┌──────┐  ┌─────────┐ ┌──────┐
+│Memory│  │ RAG  │  │ Web-RAG │ │Tools │
+│Store │  │Vector│  │Search   │ │Exec  │
+└──┬───┘  │Store │  │Fetch    │ └──┬───┘
+   │      └──────┘  └────┬────┘    │
+   │                     │         │
+   └─────────────────────┴─────────┘
                     │
                     ▼
+           ┌─────────────┐
+           │Context Mgr  │  → Build optimal context window
+           └──────┬──────┘
+                  │
+                  ▼
+           ┌─────────────┐
+           │ SoulSync    │  → Emotion detection + Tone adaptation
+           └──────┬──────┘
+                  │
+                  ▼
+           ┌─────────────┐
+           │ LLM (Ollama)│  → Local inference
+           └──────┬──────┘
+                  │
+                  ▼
+           ┌─────────────┐
+           │ Confidence  │  → Quality scoring + Fallback
+           └──────┬──────┘
+                  │
+                  ▼
             Streaming Response
-                    │
-                    ▼
-              ┌──────────┐
-              │  Chat UI │ ← PySide6 (modern dark theme)
-              │ (bubble) │
-              └──────────┘
 ```
 
-### Module Breakdown
+---
 
-| Module | Purpose |
-|--------|---------|
-| `core/agent.py` | AgentController — main orchestrator |
-| `core/memory.py` | SQLite conversation persistence |
-| `core/soulsync.py` | Emotion detection & tone adaptation |
-| `core/planner.py` | Intent detection & task planning |
-| `core/llm.py` | Ollama client with caching |
-| `tools/executor.py` | Whitelist-based tool execution |
-| `tools/system_tools.py` | Built-in system tools |
-| `ui/chat_ui.py` | Modern PySide6 interface |
-| `ui/bubble.py` | Floating quick-access bubble |
+## Why AIOS?
+
+| Cloud AI | AIOS |
+|----------|------|
+| Sends your data to servers | Everything stays local |
+| Knowledge cutoff dates | Real-time web research |
+| Monthly subscriptions | Free, open source |
+| "Trust us" with privacy | Your machine, your control |
 
 ---
 
-## 🚀 Quick Start
+## Components
 
-### Prerequisites
+**Core (`core/`)**
+- `agent.py` — Main orchestrator
+- `memory.py` — SQLite persistence
+- `soulsync.py` — Emotional intelligence
+- `planner.py` — Intent detection
+- `llm.py` — Ollama client
+- `context_manager.py` — Smart context window
+- `mode_controller.py` — Mode detection
+- `confidence.py` — Quality scoring
 
-- **Python 3.10+**
-- **[Ollama](https://ollama.ai)** installed and running
-- Any Ollama model pulled (e.g., `ollama pull llama3.2`)
+**RAG (`rag/`)**
+- `web_search.py` — Searx integration
+- `web_fetch.py` — Content extraction
+- `processor.py` — Clean + chunk
+- `embedder.py` — Local embeddings
+- `vector_store.py` — FAISS storage
+- `retriever.py` — Smart retrieval
+- `pipeline.py` — End-to-end RAG
 
-### Installation
+**Tools (`tools/`)**
+- `executor.py` — Sandboxed execution
+- `system_tools.py` — File, calc, system
 
-```bash
-# Clone the repository
-git clone https://github.com/harshitgavita-07/Aios.git
-cd Aios
+**UI (`ui/`)**
+- `chat_ui.py` — Agent-first interface
+- `bubble.py` — Floating access
 
-# Install dependencies
-pip install -r requirements.txt
+---
 
-# Run AIOS
-python app.py
+## Usage
+
+### Chat Mode
+
+```
+You: What's the weather like?
+AIOS: I don't have real-time weather data, but I can help you find
+      it if you'd like me to search the web.
 ```
 
-A floating bubble will appear on your desktop. Click it to open the assistant window.
+### Research Mode
+
+```
+You: Latest developments in AI
+AIOS: [Thinking...]
+      🔍 Searching web...
+      📄 Found 8 relevant sources
+      [Provides summary with citations]
+```
+
+### Execute Mode
+
+```
+You: Calculate 15% of 2847
+AIOS: [Using calculator tool]
+      427.05
+```
 
 ---
 
-## 💻 Usage
+## Features
 
-### Chat Interface
-
-The main window features:
-- **Left Panel**: Conversation history and thread management
-- **Center Panel**: Chat display with streaming responses
-- **Right Panel**: System status and quick actions
-- **Bottom**: Input field with command support
-
-### Commands
-
-Type `/help` in the chat for available commands:
-
-| Command | Description |
-|---------|-------------|
-| `/help` | Show available commands |
-| `/clear` | Clear current conversation |
-| `/status` | Show system status |
-| `/memory` | Show memory statistics |
-
-### Floating Bubble
-
-- **Click**: Open chat window
-- **Drag**: Reposition anywhere on screen
-- **Always on top**: Access from any application
+- **Streaming responses** — Tokens appear in real-time
+- **Thinking indicators** — See what's happening
+- **Source citations** — Web results linked
+- **Confidence scores** — Know when to trust
+- **Emotion adaptation** — Tone matches your mood
+- **Persistent memory** — Conversations remembered
+- **Knowledge caching** — 24hr freshness
+- **Hardware-aware** — Auto-optimizes for your GPU
 
 ---
 
-## 🖥️ Hardware-Aware Model Selection
+## Roadmap
 
-AIOS automatically detects your hardware and recommends the optimal model:
-
-| VRAM | Recommended Models |
-|------|-------------------|
-| ≤ 4 GB | `llama3.2:1b`, `phi3:mini`, `gemma2:2b` |
-| ≤ 6 GB | `llama3.2:3b`, `phi3:3.8b`, `qwen2.5:3b` |
-| ≤ 10 GB | `llama3.1:8b`, `mistral:7b`, `qwen2.5:7b` |
-| ≤ 16 GB | `qwen2.5:14b`, `deepseek-r1:14b` |
-| ≤ 24 GB | `qwen2.5:32b`, `deepseek-r1:32b` |
-| 24+ GB | `llama3.1:70b`, `qwen2.5:72b` |
-
----
-
-## 🔧 Tool System
-
-AIOS includes sandboxed tools for safe system interaction:
-
-| Tool | Description |
-|------|-------------|
-| `think` | Structured reasoning step |
-| `calculator` | Safe mathematical evaluation |
-| `file_read` | Read files (restricted directories) |
-| `file_write` | Write files (restricted directories) |
-| `list_directory` | Browse directories |
-| `system_info` | Hardware and system information |
-
-**Security**: All tools are **whitelisted** — only registered, approved tools can execute. File operations are restricted to `~/Documents`, `~/Downloads`, and `~/Desktop`.
-
----
-
-## 🧠 SoulSync (Emotional Intelligence)
-
-SoulSync analyzes your messages for emotional content and adapts the AI's tone:
-
-**Detected Emotions**: joy, anger, sadness, fear, surprise, confusion, urgency, neutral
-
-**Tone Adaptations**:
-- **Joy** → Enthusiastic, casual
-- **Anger** → Calm, soothing
-- **Confusion** → Patient, technical
-- **Urgency** → Direct, concise
-
-Your emotional patterns and user profile persist across sessions in `data/user_profile.json`.
-
----
-
-## 🗂️ Memory System
-
-Conversations are stored in `data/aios_memory.db`:
-
-- **Persistent threads**: Multiple conversation contexts
-- **Message history**: Last 20 messages in context window
-- **Metadata tracking**: Tool calls, emotions, timestamps
-- **Searchable**: Query past conversations
-
----
-
-## 🛣️ Roadmap
-
-- [x] Agent system with intent detection
+- [x] Agent system with mode detection
 - [x] Persistent memory (SQLite)
 - [x] Emotional intelligence (SoulSync)
-- [x] Tool execution system
-- [x] Modern PySide6 UI
-- [ ] Voice input / TTS output
-- [ ] Custom tool creation API
-- [ ] Plugin/extension system
-- [ ] Hotkey activation
-- [ ] Model fine-tuning support
+- [x] Tool execution
+- [x] Modern UI with thinking steps
+- [x] Web RAG (Searx-based)
+- [x] Confidence scoring
+- [ ] Voice input/output
+- [ ] Custom tool API
+- [ ] Plugin system
 - [ ] Multi-agent collaboration
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-We welcome contributions! Areas of interest:
+**Principles:**
 
-- **New tools**: File operations, web scraping (local), API integrations
-- **UI improvements**: Themes, accessibility, animations
-- **Core features**: Multi-agent, tool creation API
-- **Documentation**: Tutorials, examples, architecture guides
+1. **Modular** — Each component is self-contained
+2. **Clear** — Code explains itself
+3. **Extensible** — Easy to add features
+4. **Local-first** — No cloud dependencies
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See `CONTRIBUTING.md` for guidelines.
 
 ---
 
-## 📄 License
+## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT
 
 ---
 
 <div align="center">
 
-**Built with ❤️ for the local AI community**
-
-*Star ⭐ if you believe AI should stay on your machine*
+**Built for the local AI future.**
 
 </div>

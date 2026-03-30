@@ -1,52 +1,87 @@
 """
-Chat UI — Modern PySide6 interface for AIOS
-Dark theme with streaming, memory panel, and status indicators.
+Chat UI — Agent-First Design for AIOS
+Shows intelligence, not just chat.
 """
 
 import logging
 from typing import Optional
+from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QLineEdit,
     QPushButton, QLabel, QFrame, QSplitter, QListWidget, QListWidgetItem,
-    QMessageBox, QMenu, QSystemTrayIcon, QApplication
+    QMessageBox, QScrollArea, QSizePolicy, QProgressBar
 )
-from PySide6.QtCore import Qt, QTimer, QSize
-from PySide6.QtGui import QFont, QColor, QPalette, QAction
+from PySide6.QtCore import Qt, QTimer, QSize, QThread, Signal
+from PySide6.QtGui import QFont, QColor, QPalette
 
 from core.agent import AgentController
-from ui.worker import AgentWorker
 
 log = logging.getLogger("aios.ui")
 
 
+class StreamWorker(QThread):
+    """Worker thread for streaming responses."""
+    
+    token_signal = Signal(str)
+    thinking_signal = Signal(str)
+    mode_signal = Signal(str)
+    sources_signal = Signal(int)
+    complete_signal = Signal(str)
+    error_signal = Signal(str)
+
+    def __init__(self, agent, user_input):
+        super().__init__()
+        self.agent = agent
+        self.user_input = user_input
+
+    def run(self):
+        try:
+            for update in self.agent.process_stream(self.user_input):
+                if update["type"] == "token":
+                    self.token_signal.emit(update["content"])
+                elif update["type"] == "thinking":
+                    self.thinking_signal.emit(update["message"])
+                elif update["type"] == "mode":
+                    self.mode_signal.emit(update["mode"])
+                elif update["type"] == "sources":
+                    self.sources_signal.emit(update["count"])
+                elif update["type"] == "complete":
+                    self.complete_signal.emit(update["confidence"])
+                elif update["type"] == "error":
+                    self.error_signal.emit(update["message"])
+        except Exception as e:
+            self.error_signal.emit(str(e))
+
+
 class ChatWindow(QWidget):
     """
-    Modern chat interface for AIOS.
+    Agent-first UI that shows system intelligence.
     
-    Change: Redesigned modern UI with memory panel
+    Change: Agent-first design (not chat-first)
     Why:
-    - Previous UI was basic and limited
-    - Users need conversation history access
-    - Dark theme is standard for dev tools
+    - Previous UI was standard chat
+    - Users need to see what's happening
+    - Transparency builds trust
     Impact:
-    - Professional appearance
-    - Better feature accessibility
+    - System-aware interface
+    - Visible intelligence
+    - Better user experience
     """
 
     def __init__(self, agent: AgentController):
         super().__init__()
         self.agent = agent
-        self.worker: Optional[AgentWorker] = None
+        self.worker: Optional[StreamWorker] = None
         
         self.setWindowTitle("AIOS — Local AI Runtime")
-        self.setMinimumSize(900, 700)
+        self.setMinimumSize(1000, 750)
         
         self._setup_styles()
         self._setup_ui()
         self._update_memory_panel()
         
-        # Status update timer
+        # Status timer
         self._status_timer = QTimer(self)
         self._status_timer.timeout.connect(self._update_status)
         self._status_timer.start(5000)
@@ -54,12 +89,11 @@ class ChatWindow(QWidget):
         log.info("ChatWindow initialized")
 
     def _setup_styles(self):
-        """Configure application styles."""
-        # Dark theme palette
+        """Configure dark theme styles."""
         self.setStyleSheet("""
             QWidget {
-                background-color: #0f172a;
-                color: #e2e8f0;
+                background-color: #0a0f1a;
+                color: #e8ecf1;
                 font-family: 'Segoe UI', -apple-system, sans-serif;
                 font-size: 13px;
             }
@@ -69,13 +103,13 @@ class ChatWindow(QWidget):
             }
             
             QTextEdit {
-                background-color: #1e293b;
-                color: #e2e8f0;
-                border: 1px solid #334155;
+                background-color: #141b2d;
+                color: #e8ecf1;
+                border: 1px solid #2d3a5c;
                 border-radius: 8px;
                 padding: 12px;
                 font-size: 14px;
-                line-height: 1.5;
+                line-height: 1.6;
             }
             
             QTextEdit:focus {
@@ -83,11 +117,11 @@ class ChatWindow(QWidget):
             }
             
             QLineEdit {
-                background-color: #1e293b;
-                color: #e2e8f0;
-                border: 1px solid #334155;
+                background-color: #141b2d;
+                color: #e8ecf1;
+                border: 1px solid #2d3a5c;
                 border-radius: 8px;
-                padding: 12px 16px;
+                padding: 14px 18px;
                 font-size: 14px;
             }
             
@@ -110,16 +144,17 @@ class ChatWindow(QWidget):
             }
             
             QPushButton:disabled {
-                background-color: #334155;
+                background-color: #1e293b;
                 color: #64748b;
             }
             
             QPushButton#secondary {
-                background-color: #334155;
+                background-color: #1e293b;
+                border: 1px solid #2d3a5c;
             }
             
             QPushButton#secondary:hover {
-                background-color: #475569;
+                background-color: #2d3a5c;
             }
             
             QPushButton#danger {
@@ -131,24 +166,26 @@ class ChatWindow(QWidget):
             }
             
             QListWidget {
-                background-color: #1e293b;
-                border: 1px solid #334155;
+                background-color: #141b2d;
+                border: 1px solid #2d3a5c;
                 border-radius: 8px;
                 padding: 8px;
             }
             
             QListWidget::item {
-                padding: 8px 12px;
-                border-radius: 4px;
+                padding: 10px 12px;
+                border-radius: 6px;
                 margin: 2px 0;
+                color: #94a3b8;
             }
             
             QListWidget::item:selected {
                 background-color: #3b82f6;
+                color: white;
             }
             
             QListWidget::item:hover {
-                background-color: #334155;
+                background-color: #1e293b;
             }
             
             QLabel {
@@ -156,8 +193,8 @@ class ChatWindow(QWidget):
             }
             
             QLabel#header {
-                color: #e2e8f0;
-                font-size: 18px;
+                color: #e8ecf1;
+                font-size: 16px;
                 font-weight: 700;
             }
             
@@ -166,49 +203,56 @@ class ChatWindow(QWidget):
                 font-size: 11px;
             }
             
-            QSplitter::handle {
-                background-color: #334155;
+            QProgressBar {
+                border: none;
+                border-radius: 4px;
+                background-color: #1e293b;
+                height: 4px;
             }
             
-            QSplitter::handle:horizontal {
-                width: 2px;
+            QProgressBar::chunk {
+                background-color: #3b82f6;
+                border-radius: 4px;
+            }
+            
+            QSplitter::handle {
+                background-color: #1e293b;
             }
         """)
 
     def _setup_ui(self):
-        """Setup the UI layout."""
+        """Setup the agent-first UI layout."""
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # Splitter for resizable panels
+        # Main splitter
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Left panel: Memory/History
+        # Left: Memory panel
         left_panel = self._create_left_panel()
         splitter.addWidget(left_panel)
         splitter.setStretchFactor(0, 0)
         
-        # Center panel: Chat
+        # Center: Main interaction
         center_panel = self._create_center_panel()
         splitter.addWidget(center_panel)
         splitter.setStretchFactor(1, 1)
         
-        # Right panel: Info/Status
+        # Right: Intelligence panel
         right_panel = self._create_right_panel()
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(2, 0)
         
-        # Set splitter sizes
-        splitter.setSizes([200, 600, 180])
+        splitter.setSizes([200, 600, 220])
         
         layout.addWidget(splitter)
         self.setLayout(layout)
 
     def _create_left_panel(self) -> QWidget:
-        """Create the left sidebar with memory/history."""
+        """Create memory/conversation panel."""
         panel = QWidget()
-        panel.setMaximumWidth(250)
+        panel.setMaximumWidth(240)
         panel.setMinimumWidth(180)
         
         layout = QVBoxLayout()
@@ -226,199 +270,203 @@ class ChatWindow(QWidget):
         new_chat_btn.clicked.connect(self._on_new_chat)
         layout.addWidget(new_chat_btn)
         
-        # Conversation list
+        # Thread list
         self.thread_list = QListWidget()
         self.thread_list.itemClicked.connect(self._on_thread_selected)
         layout.addWidget(self.thread_list)
         
-        # Memory stats
-        self.memory_stats_label = QLabel("No conversations")
-        self.memory_stats_label.setObjectName("status")
-        self.memory_stats_label.setWordWrap(True)
-        layout.addWidget(self.memory_stats_label)
+        # Stats
+        self.memory_stats = QLabel("0 conversations")
+        self.memory_stats.setObjectName("status")
+        self.memory_stats.setWordWrap(True)
+        layout.addWidget(self.memory_stats)
         
         panel.setLayout(layout)
         return panel
 
     def _create_center_panel(self) -> QWidget:
-        """Create the center chat panel."""
+        """Create main interaction panel."""
         panel = QWidget()
         
         layout = QVBoxLayout()
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
         
-        # Header with status
-        header_layout = QHBoxLayout()
+        # Header
+        header = self._create_header()
+        layout.addLayout(header)
         
-        self.title_label = QLabel("🤖 AIOS")
-        self.title_label.setObjectName("header")
-        header_layout.addWidget(self.title_label)
+        # Thinking indicator (shows processing steps)
+        self.thinking_frame = QFrame()
+        thinking_layout = QHBoxLayout()
+        thinking_layout.setContentsMargins(12, 8, 12, 8)
         
-        header_layout.addStretch()
+        self.thinking_label = QLabel("")
+        self.thinking_label.setStyleSheet("color: #3b82f6; font-size: 12px;")
+        thinking_layout.addWidget(self.thinking_label)
+        thinking_layout.addStretch()
         
-        # Status indicator
-        self.status_indicator = QLabel("● Ready")
-        self.status_indicator.setStyleSheet("color: #22c55e; font-size: 12px;")
-        header_layout.addWidget(self.status_indicator)
-        
-        layout.addLayout(header_layout)
-        
-        # Hardware info bar
-        self.hw_label = QLabel(self._get_hw_text())
-        self.hw_label.setObjectName("status")
-        layout.addWidget(self.hw_label)
+        self.thinking_frame.setLayout(thinking_layout)
+        self.thinking_frame.setStyleSheet("background-color: #1e293b; border-radius: 6px;")
+        self.thinking_frame.hide()
+        layout.addWidget(self.thinking_frame)
         
         # Chat display
         self.chat_display = QTextEdit()
         self.chat_display.setReadOnly(True)
-        self.chat_display.setPlaceholderText("Your conversation will appear here...")
         layout.addWidget(self.chat_display)
         
-        # Welcome message
+        # Show welcome
         self._show_welcome()
         
         # Input area
         input_layout = QHBoxLayout()
         
         self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Ask anything or type /help for commands...")
+        self.input_field.setPlaceholderText("Ask anything, research a topic, or execute a task...")
         self.input_field.returnPressed.connect(self._on_send)
         input_layout.addWidget(self.input_field)
         
         self.send_btn = QPushButton("Send")
-        self.send_btn.setFixedWidth(80)
+        self.send_btn.setFixedWidth(90)
         self.send_btn.clicked.connect(self._on_send)
         input_layout.addWidget(self.send_btn)
         
         layout.addLayout(input_layout)
         
         # Bottom toolbar
-        toolbar = QHBoxLayout()
-        
-        clear_btn = QPushButton("🗑 Clear")
-        clear_btn.setObjectName("secondary")
-        clear_btn.setFixedWidth(90)
-        clear_btn.clicked.connect(self._on_clear)
-        toolbar.addWidget(clear_btn)
-        
-        toolbar.addStretch()
-        
-        settings_btn = QPushButton("⚙ Settings")
-        settings_btn.setObjectName("secondary")
-        settings_btn.setFixedWidth(100)
-        settings_btn.clicked.connect(self._on_settings)
-        toolbar.addWidget(settings_btn)
-        
+        toolbar = self._create_toolbar()
         layout.addLayout(toolbar)
         
         panel.setLayout(layout)
         return panel
 
     def _create_right_panel(self) -> QWidget:
-        """Create the right info panel."""
+        """Create intelligence/sources panel."""
         panel = QWidget()
-        panel.setMaximumWidth(220)
-        panel.setMinimumWidth(160)
+        panel.setMaximumWidth(240)
+        panel.setMinimumWidth(180)
         
         layout = QVBoxLayout()
         layout.setContentsMargins(8, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setSpacing(16)
+        
+        # Mode indicator
+        mode_header = QLabel("🎯 Mode")
+        mode_header.setObjectName("header")
+        layout.addWidget(mode_header)
+        
+        self.mode_label = QLabel("💬 Chat")
+        self.mode_label.setStyleSheet("color: #22c55e; font-size: 13px; padding: 8px;")
+        layout.addWidget(self.mode_label)
         
         # Status section
         status_header = QLabel("📊 Status")
         status_header.setObjectName("header")
-        status_header.setStyleSheet("font-size: 14px;")
         layout.addWidget(status_header)
         
-        self.model_label = QLabel(f"Model: {self.agent.llm.get_model()}")
-        self.model_label.setObjectName("status")
-        self.model_label.setWordWrap(True)
-        layout.addWidget(self.model_label)
+        self.model_status = QLabel(f"Model: {self.agent.llm.get_model()}")
+        self.model_status.setObjectName("status")
+        self.model_status.setWordWrap(True)
+        layout.addWidget(self.model_status)
         
-        self.emotion_label = QLabel("Emotion: neutral")
-        self.emotion_label.setObjectName("status")
-        layout.addWidget(self.emotion_label)
+        self.confidence_status = QLabel("Confidence: —")
+        self.confidence_status.setObjectName("status")
+        layout.addWidget(self.confidence_status)
         
-        layout.addSpacing(20)
+        self.emotion_status = QLabel("Emotion: neutral")
+        self.emotion_status.setObjectName("status")
+        layout.addWidget(self.emotion_status)
         
-        # Quick actions
-        actions_header = QLabel("⚡ Actions")
-        actions_header.setObjectName("header")
-        actions_header.setStyleSheet("font-size: 14px;")
-        layout.addWidget(actions_header)
+        # Sources section
+        sources_header = QLabel("📚 Sources")
+        sources_header.setObjectName("header")
+        layout.addWidget(sources_header)
         
-        actions = [
-            ("System Info", self._on_system_info),
-            ("Clear Memory", self._on_clear_memory),
-        ]
-        
-        for label, handler in actions:
-            btn = QPushButton(label)
-            btn.setObjectName("secondary")
-            btn.clicked.connect(handler)
-            layout.addWidget(btn)
+        self.sources_list = QListWidget()
+        self.sources_list.setMaximumHeight(200)
+        layout.addWidget(self.sources_list)
         
         layout.addStretch()
-        
-        # Version
-        version_label = QLabel("AIOS v2.0")
-        version_label.setObjectName("status")
-        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(version_label)
         
         panel.setLayout(layout)
         return panel
 
-    def _show_welcome(self):
-        """Show welcome message."""
-        welcome = """<html>
-        <body style="color: #94a3b8;">
-        <h2 style="color: #e2e8f0;">Welcome to AIOS v2.0</h2>
-        <p>Your local AI runtime with memory, emotion, and tool execution.</p>
-        <p><b>Features:</b></p>
-        <ul>
-            <li>💾 Persistent conversation memory</li>
-            <li>😊 Emotional intelligence (SoulSync)</li>
-            <li>🔧 Tool execution (calculator, files, system)</li>
-            <li>⚡ Streaming responses</li>
-        </ul>
-        <p>Type <code>/help</code> for commands.</p>
-        </body>
-        </html>"""
-        self.chat_display.setHtml(welcome)
-
-    def _get_hw_text(self) -> str:
-        """Get hardware info text."""
+    def _create_header(self) -> QHBoxLayout:
+        """Create header with system info."""
+        layout = QHBoxLayout()
+        
+        # Title
+        title = QLabel("🤖 AIOS")
+        title.setObjectName("header")
+        title.setStyleSheet("font-size: 24px;")
+        layout.addWidget(title)
+        
+        layout.addStretch()
+        
+        # Hardware badge
         hw = self.agent.llm.get_hardware_info()
-        gpu = hw.get("gpu_name", "CPU")
         vram = hw.get("vram_gb", 0)
+        gpu = hw.get("gpu_name", "CPU")
         
         if vram > 0:
-            return f"🖥️ {gpu} • {vram:.1f} GB VRAM"
-        return f"🖥️ {gpu}"
-
-    def _update_memory_panel(self):
-        """Update the memory/thread panel."""
-        self.thread_list.clear()
+            hw_text = f"🖥️ {gpu[:15]} • {vram:.0f}GB"
+        else:
+            hw_text = f"🖥️ {gpu[:20]}"
         
-        threads = self.agent.memory.get_threads()
-        for thread in threads:
-            item = QListWidgetItem(thread["title"])
-            item.setData(Qt.ItemDataRole.UserRole, thread["id"])
-            self.thread_list.addItem(item)
+        hw_label = QLabel(hw_text)
+        hw_label.setObjectName("status")
+        layout.addWidget(hw_label)
         
-        stats = self.agent.memory.get_stats()
-        self.memory_stats_label.setText(
-            f"{stats['thread_count']} conversations\n"
-            f"{stats['message_count']} messages"
-        )
+        return layout
 
-    def _update_status(self):
-        """Update status indicators."""
-        context = self.agent.soulsync.get_context()
-        emotion = context.get("emotion", {})
-        self.emotion_label.setText(f"Emotion: {emotion.get('dominant', 'neutral')}")
+    def _create_toolbar(self) -> QHBoxLayout:
+        """Create bottom toolbar."""
+        layout = QHBoxLayout()
+        
+        # Commands hint
+        hint = QLabel("Commands: /help /clear /status")
+        hint.setObjectName("status")
+        layout.addWidget(hint)
+        
+        layout.addStretch()
+        
+        # Settings
+        settings_btn = QPushButton("⚙")
+        settings_btn.setObjectName("secondary")
+        settings_btn.setFixedSize(40, 32)
+        settings_btn.clicked.connect(self._on_settings)
+        layout.addWidget(settings_btn)
+        
+        return layout
+
+    def _show_welcome(self):
+        """Show welcome message."""
+        welcome_html = """
+        <html>
+        <head>
+            <style>
+                body { color: #94a3b8; font-family: 'Segoe UI', sans-serif; }
+                h2 { color: #e8ecf1; margin-top: 0; }
+                .feature { margin: 8px 0; }
+                .highlight { color: #3b82f6; font-weight: 600; }
+            </style>
+        </head>
+        <body>
+            <h2>Welcome to AIOS v2.0</h2>
+            <p>Your local AI runtime with <span class="highlight">reasoning</span>, 
+            <span class="highlight">memory</span>, and <span class="highlight">research</span> capabilities.</p>
+            
+            <div class="feature">💬 <b>Chat</b> — Natural conversations with memory</div>
+            <div class="feature">🔍 <b>Research</b> — Ask about latest information</div>
+            <div class="feature">🔧 <b>Execute</b> — Run tools and calculations</div>
+            <div class="feature">😊 <b>Adaptive</b> — Emotion-aware responses</div>
+            
+            <p style="margin-top: 16px;"><i>Type a message to begin...</i></p>
+        </body>
+        </html>
+        """
+        self.chat_display.setHtml(welcome_html)
 
     def _on_send(self):
         """Handle send button."""
@@ -426,55 +474,85 @@ class ChatWindow(QWidget):
         if not text:
             return
         
-        # Check for commands
+        # Check commands
         if text.startswith("/"):
             self._handle_command(text)
             self.input_field.clear()
             return
         
-        # Disable input during processing
-        self._set_processing(True)
-        
-        # Add user message to display
+        # Show user message
         self._append_message("user", text)
         self.input_field.clear()
+        self.input_field.setEnabled(False)
+        self.send_btn.setEnabled(False)
         
-        # Start agent worker
-        self.worker = AgentWorker(self.agent, text)
-        self.worker.token_received.connect(self._on_token)
-        self.worker.response_complete.connect(self._on_complete)
-        self.worker.error_occurred.connect(self._on_error)
+        # Clear previous sources
+        self.sources_list.clear()
+        
+        # Start worker
+        self.worker = StreamWorker(self.agent, text)
+        self.worker.token_signal.connect(self._on_token)
+        self.worker.thinking_signal.connect(self._on_thinking)
+        self.worker.mode_signal.connect(self._on_mode)
+        self.worker.sources_signal.connect(self._on_sources)
+        self.worker.complete_signal.connect(self._on_complete)
+        self.worker.error_signal.connect(self._on_error)
         self.worker.start()
 
     def _on_token(self, token: str):
         """Handle streaming token."""
-        self._append_token(token)
+        self.thinking_frame.hide()
+        
+        # Check if we need to add assistant prefix
+        cursor = self.chat_display.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        
+        # Simple append (in production, track message state)
+        cursor.insertText(token)
+        self.chat_display.setTextCursor(cursor)
+        self.chat_display.ensureCursorVisible()
 
-    def _on_complete(self, response: str):
+    def _on_thinking(self, message: str):
+        """Show thinking step."""
+        self.thinking_label.setText(message)
+        self.thinking_frame.show()
+
+    def _on_mode(self, mode: str):
+        """Update mode display."""
+        mode_emoji = {
+            "chat": "💬",
+            "research": "🔍",
+            "execute": "🔧",
+            "reason": "🧠"
+        }
+        emoji = mode_emoji.get(mode, "💬")
+        self.mode_label.setText(f"{emoji} {mode.title()}")
+
+    def _on_sources(self, count: int):
+        """Show sources found."""
+        self.sources_list.addItem(f"📄 {count} web sources")
+
+    def _on_complete(self, confidence: str):
         """Handle completion."""
-        self._set_processing(False)
+        self.input_field.setEnabled(True)
+        self.send_btn.setEnabled(True)
+        self.input_field.setFocus()
+        self.thinking_frame.hide()
+        
+        self.confidence_status.setText(f"Confidence: {confidence.upper()}")
+        
         self._update_memory_panel()
+        self._update_status()
 
     def _on_error(self, error: str):
         """Handle error."""
         self._append_message("system", f"Error: {error}")
-        self._set_processing(False)
-
-    def _set_processing(self, processing: bool):
-        """Set UI processing state."""
-        self.send_btn.setEnabled(not processing)
-        self.input_field.setEnabled(not processing)
-        
-        if processing:
-            self.status_indicator.setText("● Thinking...")
-            self.status_indicator.setStyleSheet("color: #eab308; font-size: 12px;")
-        else:
-            self.status_indicator.setText("● Ready")
-            self.status_indicator.setStyleSheet("color: #22c55e; font-size: 12px;")
-            self.input_field.setFocus()
+        self.input_field.setEnabled(True)
+        self.send_btn.setEnabled(True)
+        self.thinking_frame.hide()
 
     def _append_message(self, role: str, content: str):
-        """Append a message to the chat display."""
+        """Append message to chat."""
         colors = {
             "user": "#3b82f6",
             "assistant": "#22c55e",
@@ -486,36 +564,18 @@ class ChatWindow(QWidget):
             "system": "⚙️"
         }
         
-        color = colors.get(role, "#e2e8f0")
+        color = colors.get(role, "#e8ecf1")
         icon = icons.get(role, "💬")
         
+        escaped = content.replace("<", "&lt;").replace(">", "&gt;")
+        
         html = f"""
-        <div style="margin: 8px 0; padding: 8px; border-left: 3px solid {color};">
-            <span style="color: {color}; font-weight: bold;">{icon}</span>
-            <span style="color: #e2e8f0;">{self._escape_html(content)}</span>
+        <div style="margin: 12px 0; padding: 12px; border-left: 3px solid {color};">
+            <span style="color: {color}; font-weight: 600;">{icon}</span>
+            <span style="color: #e8ecf1;">{escaped}</span>
         </div>
         """
-        
         self.chat_display.append(html)
-
-    def _append_token(self, token: str):
-        """Append a streaming token."""
-        # This is a simplified approach - in production, you'd track the current
-        # assistant message and append to it
-        cursor = self.chat_display.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        cursor.insertText(token)
-        self.chat_display.setTextCursor(cursor)
-        self.chat_display.ensureCursorVisible()
-
-    def _escape_html(self, text: str) -> str:
-        """Escape HTML special characters."""
-        return (text
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
-                .replace("\n", "<br>"))
 
     def _handle_command(self, command: str):
         """Handle slash commands."""
@@ -533,42 +593,47 @@ class ChatWindow(QWidget):
             self._append_message("system", f"Unknown command: {command}")
 
     def _show_help(self):
-        """Show help message."""
-        help_text = """<b>Available commands:</b>
-<ul>
-<li><code>/help</code> - Show this help</li>
-<li><code>/clear</code> - Clear current conversation</li>
-<li><code>/status</code> - Show system status</li>
-<li><code>/memory</code> - Show memory statistics</li>
-</ul>"""
+        """Show help."""
+        help_text = """
+        <b>Available Commands:</b><br>
+        <code>/help</code> — Show this help<br>
+        <code>/clear</code> — Clear conversation<br>
+        <code>/status</code> — System status<br>
+        <code>/memory</code> — Memory stats<br>
+        <br>
+        <b>Modes:</b><br>
+        💬 Chat — Natural conversation<br>
+        🔍 Research — Web search + RAG<br>
+        🔧 Execute — Tool execution<br>
+        """
         self.chat_display.append(help_text)
 
     def _show_status(self):
         """Show system status."""
         status = self.agent.get_status()
-        status_text = f"""<b>System Status:</b>
-<ul>
-<li>Model: {status['model']}</li>
-<li>Emotion: {status['emotion']}</li>
-<li>Threads: {status['memory_stats']['thread_count']}</li>
-<li>Messages: {status['memory_stats']['message_count']}</li>
-</ul>"""
+        status_text = f"""
+        <b>System Status</b><br>
+        Model: {status['model']}<br>
+        Emotion: {status['emotion']}<br>
+        Memory: {status['memory_stats']['message_count']} messages<br>
+        Knowledge: {status['rag_stats']['vector_store_size']} vectors<br>
+        """
         self.chat_display.append(status_text)
 
     def _show_memory(self):
-        """Show memory statistics."""
+        """Show memory stats."""
         stats = self.agent.memory.get_stats()
-        memory_text = f"""<b>Memory Statistics:</b>
-<ul>
-<li>Conversations: {stats['thread_count']}</li>
-<li>Total Messages: {stats['message_count']}</li>
-<li>User Messages: {stats['user_messages']}</li>
-<li>Assistant Messages: {stats['assistant_messages']}</li>
-</ul>"""
-        self.chat_display.append(memory_text)
+        mem_text = f"""
+        <b>Memory Statistics</b><br>
+        Conversations: {stats['thread_count']}<br>
+        Total Messages: {stats['message_count']}<br>
+        User Messages: {stats['user_messages']}<br>
+        Assistant: {stats['assistant_messages']}<br>
+        """
+        self.chat_display.append(mem_text)
 
     def _on_new_chat(self):
-        """Create new conversation."""
+        """Create new chat."""
         thread_id = self.agent.memory.create_thread()
         self.agent.memory.switch_thread(thread_id)
         self.chat_display.clear()
@@ -576,58 +641,55 @@ class ChatWindow(QWidget):
         self._update_memory_panel()
 
     def _on_thread_selected(self, item: QListWidgetItem):
-        """Switch to selected thread."""
+        """Switch thread."""
         thread_id = item.data(Qt.ItemDataRole.UserRole)
         self.agent.memory.switch_thread(thread_id)
-        self._load_thread_messages()
+        self._load_thread()
 
-    def _load_thread_messages(self):
-        """Load messages for current thread."""
+    def _load_thread(self):
+        """Load thread messages."""
         self.chat_display.clear()
         messages = self.agent.memory.get_messages(limit=50)
         
         for msg in messages:
-            self._append_message(msg.role, msg.content)
+            if msg.role == "assistant":
+                # For assistant, just show content (would reconstruct in production)
+                self._append_message("assistant", msg.content[:200] + "...")
+            else:
+                self._append_message(msg.role, msg.content[:200])
 
     def _on_clear(self):
-        """Clear current conversation."""
+        """Clear conversation."""
         self.agent.clear_conversation()
         self.chat_display.clear()
         self._show_welcome()
         self._update_memory_panel()
 
-    def _on_clear_memory(self):
-        """Clear all memory."""
-        reply = QMessageBox.question(
-            self, "Clear Memory",
-            "Clear all conversations? This cannot be undone.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            self.agent.clear_conversation()
-            self._update_memory_panel()
-            self.chat_display.append("<i>Memory cleared.</i>")
-
     def _on_settings(self):
-        """Open settings dialog."""
-        self.chat_display.append("<i>Settings dialog not yet implemented.</i>")
+        """Settings placeholder."""
+        self._append_message("system", "Settings panel coming in v2.1")
 
-    def _on_system_info(self):
-        """Show system info."""
-        status = self.agent.get_status()
-        hw = status.get("hardware", {})
-        info_text = f"""<b>System Information:</b>
-<ul>
-<li>GPU: {hw.get('gpu_name', 'CPU')}</li>
-<li>VRAM: {hw.get('vram_gb', 0):.1f} GB</li>
-<li>RAM: {hw.get('ram_gb', 0):.1f} GB</li>
-<li>CPU Cores: {hw.get('cpu_cores', '?')}</li>
-</ul>"""
-        self.chat_display.append(info_text)
+    def _update_memory_panel(self):
+        """Update memory panel."""
+        self.thread_list.clear()
+        
+        threads = self.agent.memory.get_threads()
+        for thread in threads:
+            item = QListWidgetItem(thread["title"])
+            item.setData(Qt.ItemDataRole.UserRole, thread["id"])
+            self.thread_list.addItem(item)
+        
+        stats = self.agent.memory.get_stats()
+        self.memory_stats.setText(f"{stats['thread_count']} conversations")
+
+    def _update_status(self):
+        """Update status indicators."""
+        context = self.agent.soulsync.get_context()
+        emotion = context.get("emotion", {})
+        self.emotion_status.setText(f"Emotion: {emotion.get('dominant', 'neutral')}")
 
     def closeEvent(self, event):
-        """Handle window close."""
-        # Stop any running worker
+        """Handle close."""
         if self.worker and self.worker.isRunning():
             self.worker.terminate()
             self.worker.wait()

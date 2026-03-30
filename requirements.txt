@@ -9,6 +9,12 @@ ollama>=0.4.0
 # System Information
 psutil>=5.9.0
 
+# RAG Components (optional but recommended)
+# For local embeddings and vector search:
+# sentence-transformers>=2.2.0
+# faiss-cpu>=1.7.0
+# numpy>=1.24.0
+
 # Optional: Enhanced GPU profiling
 # pip install pyaccelerate
 
