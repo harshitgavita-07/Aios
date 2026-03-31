@@ -60,11 +60,22 @@ class MemoryStore:
 
     @contextmanager
     def _get_connection(self):
-        """Context manager for database connections."""
-        conn = sqlite3.connect(self.db_path)
+        """
+        Context manager for database connections.
+
+        Fix: Added rollback on exception to prevent dirty DB state,
+        WAL journal mode for better concurrency, and check_same_thread=False
+        to allow safe access from Qt worker threads.
+        """
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
+        # WAL mode allows concurrent reads alongside a single writer
+        conn.execute("PRAGMA journal_mode=WAL")
         try:
             yield conn
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -119,8 +130,11 @@ class MemoryStore:
                 "INSERT INTO threads (title) VALUES (?) RETURNING id",
                 ("Default Conversation",)
             )
+            # Fix: consume the RETURNING cursor BEFORE commit to avoid
+            # "cannot commit transaction - SQL statements in progress"
+            thread_id = cursor.fetchone()["id"]
             conn.commit()
-            return cursor.fetchone()["id"]
+            return thread_id
 
     def create_thread(self, title: Optional[str] = None) -> int:
         """
@@ -145,8 +159,10 @@ class MemoryStore:
                 "INSERT INTO threads (title) VALUES (?) RETURNING id",
                 (title,)
             )
-            conn.commit()
+            # Fix: consume the RETURNING cursor BEFORE commit to avoid
+            # "cannot commit transaction - SQL statements in progress"
             thread_id = cursor.fetchone()["id"]
+            conn.commit()
             log.info(f"Created thread: {title} (id={thread_id})")
             return thread_id
 
@@ -173,6 +189,11 @@ class MemoryStore:
                 (thread_id, role, content, json.dumps(metadata or {}))
             )
             
+            # Fix: consume the RETURNING cursor BEFORE issuing further
+            # statements or calling commit() to avoid
+            # "cannot commit transaction - SQL statements in progress"
+            msg_id = cursor.fetchone()["id"]
+            
             # Update thread timestamp
             conn.execute(
                 "UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -180,7 +201,6 @@ class MemoryStore:
             )
             conn.commit()
             
-            msg_id = cursor.fetchone()["id"]
             log.debug(f"Added message: role={role}, thread={thread_id}")
             return msg_id
 
