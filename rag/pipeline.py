@@ -5,6 +5,7 @@ RAG Pipeline — End-to-end retrieval and generation
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
+from pathlib import Path 
 
 from .web_search import WebSearch, WebFetcher
 from .processor import ContentProcessor
