@@ -28,10 +28,13 @@ AIOS transforms your desktop into an intelligent agent system:
 | **Emotion awareness** | Detects frustration, curiosity, excitement and adapts tone. |
 | **Intent routing** | Distinguishes chat, tool execution, and system commands. |
 | **Tool execution** | Whitelist-only tool registry. Safe by default. |
+| **Computer control** | Run commands, open apps, take screenshots, monitor processes, control windows |
 | **Streaming UI** | Token-by-token display. UI never blocks. |
 | **Hardware-aware** | Auto-selects the best model for your GPU/CPU. |
 | **Execute** | Run calculations, file operations, system commands |
 | **Reason** | Complex analysis with step-by-step thinking |
+| **gstack integration** | Role-based agent workflows (CEO, Engineer, QA, etc.) |
+| **Professional prompts** | Claude Code, Desktop Code, and Sonnet 4.6 system prompt patterns |
 
 ---
 
@@ -93,11 +96,34 @@ Aios/
 │   ├── agent.py         Orchestrator — memory + soulsync + planner + LLM
 │   ├── memory.py        SQLite conversation store + user profile
 │   ├── soulsync.py      Emotion detection + tone adaptation
-│   └── planner.py       Intent detection (chat / tool / system)
+│   ├── planner.py       Intent detection (chat / tool / system)
+│   ├── confidence.py    Confidence scoring for responses
+│   ├── context_manager.py Context management and session handling
+│   └── mode_controller.py Mode switching and behavior adaptation
 │
-└── tools/
-    ├── registry.py      Whitelist-only tool registry
-    └── think_tool.py    Structured reasoning scratchpad
+├── tools/
+│   ├── registry.py      Whitelist-only tool registry
+│   ├── system_tools.py  Computer control tools (run commands, screenshots, etc.)
+│   ├── executor.py      Tool execution engine
+│   └── think_tool.py    Structured reasoning scratchpad
+│
+├── rag/
+│   ├── embedder.py      SentenceTransformers integration
+│   ├── pipeline.py      RAG processing pipeline
+│   ├── processor.py     Document processing and chunking
+│   ├── retriever.py     Vector similarity search
+│   ├── vector_store.py  FAISS vector database
+│   └── web_search.py    Real-time web search integration
+│
+├── gstack/
+│   ├── aios.py          CLI entry point for gstack workflows
+│   ├── aios_core.py     AIOS orchestrator (router + Ollama + memory)
+│   ├── aios_gstack.py   gstack Python wrapper + Claude Code integration
+│   └── core/            gstack core components
+│
+└── data/
+    └── embeddings/
+        └── faiss_index/ FAISS vector database storage
 ```
 
 ---
@@ -127,6 +153,15 @@ A floating bubble appears on your desktop. Click it to open the assistant.
 | `list models` | Shows installed Ollama models |
 | `show hardware` | Displays GPU/VRAM/CPU info |
 | `think about X` | Runs structured reasoning step via ThinkTool |
+| `run command X` | Executes system command safely |
+| `open application Y` | Launches application or opens file |
+| `take screenshot` | Captures screen and saves to Documents |
+| `show processes` | Lists running processes with CPU/memory usage |
+| `control window X` | Minimize/maximize/close/focus windows |
+| `calculate X` | Safe mathematical evaluation |
+| `read file X` | Reads file contents (sandboxed to Documents/Downloads/Desktop) |
+| `write file X` | Writes content to file (sandboxed directories) |
+| `list directory X` | Lists directory contents (sandboxed) |
 | Frustration keywords | Switches to calm, direct tone |
 | Curiosity keywords | Switches to thorough, explanatory tone |
 
@@ -157,7 +192,20 @@ Each emotion maps to a different system prompt tone. The mood is visible in the 
 
 Tools are whitelisted explicitly in `tools/registry.py`. Nothing runs unless it is on the whitelist. Currently registered:
 
+**System Tools:**
 - `think_tool` — structured reasoning scratchpad
+- `calculator` — safe mathematical evaluation
+- `file_read` — read files from sandboxed directories
+- `file_write` — write files to sandboxed directories
+- `list_directory` — browse directory contents (sandboxed)
+- `system_info` — get system information and resource usage
+- `run_command` — execute system commands safely (dangerous commands blocked)
+- `open_application` — launch applications or open files
+- `take_screenshot` — capture screen and save to Documents
+- `get_running_processes` — monitor running processes with CPU/memory stats
+- `control_window` — control application windows (minimize/maximize/close/focus)
+
+**Security:** All file operations are restricted to Documents, Downloads, and Desktop directories. Dangerous system commands are automatically blocked.
 
 To add a tool: implement a `run(payload: str) -> str` function, add the name to `_WHITELIST`, and register it in `ToolRegistry._register_defaults()`.
 
@@ -168,6 +216,12 @@ To add a tool: implement a `run(payload: str) -> str` function, add the name to 
 ```
 PySide6>=6.7.0
 ollama>=0.4.0
+psutil>=5.9.0
+pillow>=10.0.0
+pygetwindow>=0.0.9
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+numpy>=1.24.0
 ```
 
 Optional (richer GPU profiling):
@@ -175,16 +229,251 @@ Optional (richer GPU profiling):
 pip install pyaccelerate
 ```
 
+**New in v2.0:**
+- `psutil` — system monitoring and process management
+- `pillow` — screenshot capture and image handling
+- `pygetwindow` — cross-platform window control
+- `sentence-transformers` + `faiss-cpu` — RAG vector search and embeddings
+
 ---
 
 ## Roadmap
 
+- [x] Computer control tools (run commands, screenshots, window management)
+- [x] Enhanced RAG with web search and vector storage
+- [x] gstack role-based agent workflows
+- [x] Professional Claude system prompt integration
+- [x] Cricket expertise and domain knowledge
 - [ ] Voice input (Whisper via Ollama)
 - [ ] Per-session system prompt customisation
 - [ ] File context — drag a file into chat
 - [ ] Plugin API for third-party tools
 - [ ] Persistent user profile from conversation patterns
 - [ ] Hotkey to summon from anywhere
+
+---
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## Setup & Installation
+
+### Prerequisites
+
+#### 1. Install Ollama
+
+Download and install Ollama for your OS from https://ollama.ai
+
+Then pull a model (recommended for most hardware):
+```
+ollama pull qwen2.5:7b
+```
+
+Low-RAM alternative:
+```
+ollama pull llama3.2:3b
+```
+
+#### 2. Python environment (3.10+)
+
+```bash
+# From the repo root
+pip install -r requirements.txt
+```
+
+**New dependencies for v2.0:**
+- `psutil` — system monitoring (processes, CPU, memory)
+- `pillow` — screenshot capture
+- `pygetwindow` — window control
+- `sentence-transformers` — text embeddings for RAG
+- `faiss-cpu` — vector search database
+
+#### 3. Run AIOS
+
+**Always run from the repo root directory:**
+```bash
+# Windows
+cd C:\Users\HARSHIT\aios
+python app.py
+
+# macOS / Linux
+cd ~/aios
+python app.py
+```
+
+> **Important:** AIOS must be launched from the repo root.
+> `hardware.py` lives at the root and is imported by the LLM client.
+> Running `python aios/app.py` from a parent directory will fail.
+
+---
+
+## Troubleshooting
+
+### `ModuleNotFoundError: No module named 'hardware'`
+You are running `app.py` from the wrong directory.
+Fix: `cd` into the repo root first, then run `python app.py`.
+
+### `Failed to initialize agent: cannot commit transaction — SQL statements in progress`
+This was a SQLite bug fixed in v2.0.1. Pull the latest code:
+```bash
+git pull origin main
+```
+
+### `ollama.ResponseError: model not found`
+Run `ollama list` to see what models you have installed, then:
+```bash
+ollama pull qwen2.5:7b
+```
+
+### `ImportError: No module named 'sentence_transformers'`
+RAG dependencies are required. Install them:
+```bash
+pip install sentence-transformers faiss-cpu numpy
+```
+
+### Agent initialises but responses are blank / UI freezes
+Make sure Ollama is running. Open a terminal and run:
+```bash
+ollama serve
+```
+Then restart AIOS.
+
+### Computer control tools not working
+Some computer control features require additional permissions or may not work on all systems:
+
+**Screenshots:** Requires `pillow` (PIL) package. May require additional permissions on some Linux systems.
+
+**Window control:** Requires `pygetwindow` package. May have limited functionality on Linux (X11 vs Wayland).
+
+**Process monitoring:** Requires `psutil` package. May require elevated permissions on some systems.
+
+**System commands:** Some commands may be blocked for security. Check the logs for blocked command messages.
+
+### RAG features not working
+Make sure vector search dependencies are installed:
+```bash
+pip install sentence-transformers faiss-cpu numpy
+```
+
+If you get import errors, try:
+```bash
+pip install --upgrade pip
+pip install sentence-transformers faiss-cpu numpy
+```
+
+---
+
+## gstack Integration — Role-Based Agent Workflows
+
+[gstack](https://github.com/garrytan/gstack) is Garry Tan's Claude Code skill system — a collection of role-based prompt templates (CEO, Staff Engineer, QA Lead, etc.) that run as slash commands inside Claude Code.
+
+**AIOS extracts those role definitions and runs them locally via Ollama**, giving you the same structured, role-based analysis without Claude Code or Anthropic's API.
+
+```
+User Input → Router → gstack Skill → Ollama → Memory → Output
+```
+
+**Integration with main AIOS:** The gstack skills are now integrated into the main AIOS desktop application. You can access role-based workflows directly through the chat interface using commands like "plan a new feature as CEO" or "review this code as a staff engineer".
+
+### Available Skills
+
+| Skill | Role | What it does |
+|-------|------|-------------|
+| `/plan-ceo-review` | CEO / Founder | Rethinks the problem. Finds the 10-star product. |
+| `/plan-eng-review` | Engineering Manager | Architecture, data flow, test plan, edge cases. |
+| `/review` | Staff Engineer | Production bugs, security holes, correctness. |
+| `/qa` | QA Lead | Test plan, edge cases, regression risks. |
+| `/ship` | Release Engineer | Pre-ship checklist: tests, coverage, rollback. |
+| `/investigate` | Debugger | Systematic root-cause analysis. Iron Law: no fix without investigation. |
+| `/office-hours` | YC Partner | Six forcing questions that reframe the product. |
+
+### Task Router
+
+Natural language → correct skill, automatically:
+
+| Input | Routes to |
+|-------|-----------|
+| "build a NLP library" | `/plan-ceo-review` |
+| "fix the auth bug" | `/investigate` |
+| "deploy to production" | `/ship` |
+| "test the login flow" | `/qa` |
+| "review the PR" | `/review` |
+| "I'm not sure what to build" | `/office-hours` |
+| "architect the data model" | `/plan-eng-review` |
+
+### Python API for gstack
+
+```python
+from aios_core import AIOS
+
+aios = AIOS(model="llama3")
+
+# Natural language — router picks the right skill
+result = aios.run("build a NLP library for Hindi")
+
+# Explicit skill
+result = aios.plan("build BharatLang — a Python NLP library for Hindi/Indic languages")
+result = aios.review("check the tokenizer module for correctness and edge cases")
+result = aios.qa("verify the stemmer handles zero-length input")
+result = aios.ship("pre-ship checklist for v0.1 release")
+result = aios.investigate("stemmer crashes on empty string input")
+
+print(result.output)
+print(f"Skill: /{result.skill} | Model: {result.model} | ID: {result.task_id}")
+```
+
+### CLI Usage
+
+```bash
+# Run a task
+python aios.py "build a NLP library for Hindi"
+
+# Explicit skill command
+python aios.py /plan-ceo-review "build BharatLang NLP library"
+python aios.py /review "check the authentication module for security issues"
+python aios.py /ship "pre-ship checklist for v1.0 release"
+python aios.py /investigate "login fails for users with special characters in email"
+
+# Stream output as it generates
+python aios.py --stream /plan-ceo-review "build BharatLang"
+
+# System status
+python aios.py --status
+
+# Recent history
+python aios.py --history
+
+# List all skills
+python aios.py --list-skills
+```
+
+### gstack Memory
+
+All tasks are persisted to `~/.aios-gstack/memory.json`:
+
+```json
+{
+  "tasks": [
+    {
+      "id": "a1b2c3d4",
+      "skill": "plan-ceo-review",
+      "input": "Build BharatLang NLP library",
+      "output": "...",
+      "model": "llama3",
+      "ts_human": "2026-03-31 14:23:11"
+    }
+  ]
+}
+```
+
+Access via Python:
+```python
+aios = AIOS()
+history = aios.history(n=10)
+for task in history:
+    print(f"/{task['skill']}: {task['input'][:60]}")
+```
 
 ---
 
@@ -198,41 +487,6 @@ Contributions welcome. Before opening a PR:
 4. UI changes must not block the main thread
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
-=======
-    │
-    ▼
-┌─────────────────┐
-│  Mode Controller│  → Detect: Chat / Research / Execute / Reason
-└────────┬────────┘
-         │
-    ┌────┴────┬──────────┬─────────┐
-    ▼         ▼          ▼         ▼
-┌──────┐  ┌──────┐  ┌─────────┐ ┌──────┐
-│Memory│  │ RAG  │  │ Web-RAG │ │Tools │
-│Store │  │Vector│  │Search   │ │Exec  │
-└──┬───┘  │Store │  │Fetch    │ └──┬───┘
-   │      └──────┘  └────┬────┘    │
-   │                     │         │
-   └─────────────────────┴─────────┘
-                    │
-                    ▼
-           ┌─────────────┐
-           │Context Mgr  │  → Build optimal context window
-           └──────┬──────┘
-                  │
-                  ▼
-           ┌─────────────┐
-           │ SoulSync    │  → Emotion detection + Tone adaptation
-           └──────┬──────┘
-                  │
-                  ▼
-           ┌─────────────┐
-           │ LLM (Ollama)│  → Local inference
-           └──────┬──────┘
-                  │
-                  ▼
-           ┌─────────────┐
-           │ Confidence  │  → Quality scoring + Fallback
            └──────┬──────┘
                   │
                   ▼

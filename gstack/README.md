@@ -14,6 +14,8 @@
 User Input → Router → gstack Skill → Ollama → Memory → Output
 ```
 
+**Integration with main AIOS:** The gstack skills are now integrated into the main AIOS desktop application. You can access role-based workflows directly through the chat interface using commands like "plan a new feature as CEO" or "review this code as a staff engineer".
+
 ---
 
 ## Honest architecture note
