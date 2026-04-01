@@ -1,6 +1,24 @@
-﻿# Aios  core dependencies
+# AIOS v2.0 — Core Dependencies
+
+# Qt UI Framework
 PySide6>=6.7.0
+
+# LLM Integration
 ollama>=0.4.0
 
-# Optional: richer hardware profiling (GPU arch, NUMA, autotune)
+# System Information
+psutil>=5.9.0
+
+# RAG Components (optional but recommended)
+# For local embeddings and vector search:
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+numpy>=1.24.0
+
+# Optional: Enhanced GPU profiling
 # pip install pyaccelerate
+
+# Development dependencies (uncomment for dev)
+# pytest>=7.0.0
+# black>=23.0.0
+# pylint>=2.17.0

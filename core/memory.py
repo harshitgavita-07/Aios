@@ -1,118 +1,356 @@
 """
-Aios memory — SQLite-backed conversation history and user profile.
-
-Stores the last N messages per session and a persistent user profile
-so responses are context-aware across restarts.
-
-Schema
-------
-messages  : id, session_id, role, content, emotion, ts
-profile   : key, value  (simple key-value for user preferences)
+Memory System — Conversation persistence and context management
+SQLite-based storage with conversation threading.
 """
 
+import json
+import logging
 import sqlite3
-import time
-from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Dict, Any
+from contextlib import contextmanager
 
-# Default DB location: ~/.aios/memory.db
-_DB_PATH = Path.home() / ".aios" / "memory.db"
-_HISTORY_LIMIT = 20  # last N messages fed to LLM context
-
-
-# ── Setup ─────────────────────────────────────────────────────────────────
-
-def _db_path() -> Path:
-    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    return _DB_PATH
+log = logging.getLogger("aios.memory")
 
 
-@contextmanager
-def _conn():
-    con = sqlite3.connect(_db_path())
-    con.row_factory = sqlite3.Row
-    try:
-        yield con
-        con.commit()
-    finally:
-        con.close()
+@dataclass
+class Message:
+    """A single message in a conversation."""
+    role: str  # "user", "assistant", "system", "tool"
+    content: str
+    timestamp: str = ""
+    metadata: Optional[Dict[str, Any]] = None
+    
+    def __post_init__(self):
+        if not self.timestamp:
+            self.timestamp = datetime.now().isoformat()
+        if self.metadata is None:
+            self.metadata = {}
 
 
-def init() -> None:
-    """Create tables if they don't exist."""
-    with _conn() as con:
-        con.executescript("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT    NOT NULL,
-                role       TEXT    NOT NULL,
-                content    TEXT    NOT NULL,
-                emotion    TEXT    DEFAULT 'neutral',
-                ts         REAL    NOT NULL
-            );
+class MemoryStore:
+    """
+    SQLite-based conversation memory store.
+    
+    Features:
+    - Persistent conversation history
+    - Threading support for multiple conversations
+    - Efficient retrieval of last N messages
+    - Metadata storage for tool calls and emotions
+    
+    Change: SQLite-based memory system
+    Why:
+    - Previous system had no persistence
+    - Conversations were lost on restart
+    Impact:
+    - Enables memory-aware responses
+    - Provides conversation continuity
+    """
 
-            CREATE TABLE IF NOT EXISTS profile (
-                key   TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );
+    def __init__(self, db_path: Optional[Path] = None):
+        self.data_dir = db_path or Path(__file__).parent.parent / "data"
+        self.data_dir.mkdir(exist_ok=True)
+        self.db_path = self.data_dir / "aios_memory.db"
+        
+        self._init_db()
+        self.current_thread_id = self._get_or_create_default_thread()
+        log.info(f"MemoryStore initialized: {self.db_path}")
 
-            CREATE INDEX IF NOT EXISTS idx_messages_session
-                ON messages (session_id, id);
-        """)
+    @contextmanager
+    def _get_connection(self):
+        """
+        Context manager for database connections.
 
+        Fix: Added rollback on exception to prevent dirty DB state,
+        WAL journal mode for better concurrency, and check_same_thread=False
+        to allow safe access from Qt worker threads.
+        """
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        # WAL mode allows concurrent reads alongside a single writer
+        conn.execute("PRAGMA journal_mode=WAL")
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
-# ── Messages ──────────────────────────────────────────────────────────────
+    def _init_db(self):
+        """Initialize database schema."""
+        with self._get_connection() as conn:
+            # Threads table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS threads (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT DEFAULT 'New Conversation',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Messages table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    thread_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata TEXT DEFAULT '{}',
+                    FOREIGN KEY (thread_id) REFERENCES threads(id)
+                )
+            """)
+            
+            # User preferences table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS preferences (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            conn.commit()
 
-def save(session_id: str, role: str, content: str, emotion: str = "neutral") -> None:
-    """Persist one message to the database."""
-    with _conn() as con:
-        con.execute(
-            "INSERT INTO messages (session_id, role, content, emotion, ts) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (session_id, role, content, emotion, time.time()),
-        )
+    def _get_or_create_default_thread(self) -> int:
+        """Get default thread ID or create one."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT id FROM threads ORDER BY updated_at DESC LIMIT 1"
+            )
+            row = cursor.fetchone()
+            if row:
+                return row["id"]
+            
+            cursor = conn.execute(
+                "INSERT INTO threads (title) VALUES (?) RETURNING id",
+                ("Default Conversation",)
+            )
+            # Fix: consume the RETURNING cursor BEFORE commit to avoid
+            # "cannot commit transaction - SQL statements in progress"
+            thread_id = cursor.fetchone()["id"]
+            conn.commit()
+            return thread_id
 
+    def create_thread(self, title: Optional[str] = None) -> int:
+        """
+        Create a new conversation thread.
+        
+        Change: Multi-threaded conversation support
+        Why:
+        - Previous system had single conversation context
+        - Users want separate contexts for different topics
+        Impact:
+        - Better organization of conversations
+        - Cleaner context management
+        """
+        with self._get_connection() as conn:
+            if not title:
+                # Count existing threads for auto-naming
+                cursor = conn.execute("SELECT COUNT(*) as count FROM threads")
+                count = cursor.fetchone()["count"]
+                title = f"Conversation {count + 1}"
+            
+            cursor = conn.execute(
+                "INSERT INTO threads (title) VALUES (?) RETURNING id",
+                (title,)
+            )
+            # Fix: consume the RETURNING cursor BEFORE commit to avoid
+            # "cannot commit transaction - SQL statements in progress"
+            thread_id = cursor.fetchone()["id"]
+            conn.commit()
+            log.info(f"Created thread: {title} (id={thread_id})")
+            return thread_id
 
-def history(session_id: str, n: int = _HISTORY_LIMIT) -> list[dict]:
-    """Return the last *n* messages for this session as role/content dicts."""
-    with _conn() as con:
-        rows = con.execute(
-            "SELECT role, content FROM messages "
-            "WHERE session_id = ? "
-            "ORDER BY id DESC LIMIT ?",
-            (session_id, n),
-        ).fetchall()
-    # Reverse so oldest is first (correct chronological order for LLM context)
-    return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
+    def add_message(self, role: str, content: str, 
+                    thread_id: Optional[int] = None,
+                    metadata: Optional[Dict] = None) -> int:
+        """
+        Add a message to the store.
+        
+        Change: Persistent message storage with metadata
+        Why:
+        - Previous system had no persistence
+        - Metadata enables rich context tracking
+        Impact:
+        - Full conversation history
+        - Tool calls and emotions tracked
+        """
+        thread_id = thread_id or self.current_thread_id
+        
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """INSERT INTO messages (thread_id, role, content, metadata)
+                    VALUES (?, ?, ?, ?) RETURNING id""",
+                (thread_id, role, content, json.dumps(metadata or {}))
+            )
+            
+            # Fix: consume the RETURNING cursor BEFORE issuing further
+            # statements or calling commit() to avoid
+            # "cannot commit transaction - SQL statements in progress"
+            msg_id = cursor.fetchone()["id"]
+            
+            # Update thread timestamp
+            conn.execute(
+                "UPDATE threads SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (thread_id,)
+            )
+            conn.commit()
+            
+            log.debug(f"Added message: role={role}, thread={thread_id}")
+            return msg_id
 
+    def get_messages(self, limit: int = 20, 
+                     thread_id: Optional[int] = None) -> List[Message]:
+        """
+        Get last N messages from a thread.
+        
+        Change: Efficient message retrieval
+        Why:
+        - Need recent context for LLM prompts
+        - Sliding window prevents token overflow
+        Impact:
+        - Faster response generation
+        - Optimal token usage
+        """
+        thread_id = thread_id or self.current_thread_id
+        
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT role, content, timestamp, metadata 
+                    FROM messages 
+                    WHERE thread_id = ?
+                    ORDER BY timestamp DESC
+                    LIMIT ?""",
+                (thread_id, limit)
+            )
+            
+            messages = []
+            for row in cursor.fetchall():
+                messages.append(Message(
+                    role=row["role"],
+                    content=row["content"],
+                    timestamp=row["timestamp"],
+                    metadata=json.loads(row["metadata"])
+                ))
+            
+            # Return in chronological order
+            return list(reversed(messages))
 
-def clear_session(session_id: str) -> None:
-    """Wipe all messages for a session (e.g. user hits 'New Chat')."""
-    with _conn() as con:
-        con.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+    def get_formatted_history(self, limit: int = 10,
+                              thread_id: Optional[int] = None) -> List[Dict[str, str]]:
+        """
+        Get messages formatted for LLM API.
+        
+        Change: LLM-ready message formatting
+        Why:
+        - LLM APIs need specific format
+        - Reduces boilerplate in calling code
+        Impact:
+        - Cleaner LLM integration
+        - Consistent message format
+        """
+        messages = self.get_messages(limit=limit, thread_id=thread_id)
+        return [{"role": m.role, "content": m.content} for m in messages]
 
+    def get_threads(self) -> List[Dict]:
+        """Get all conversation threads."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT id, title, created_at, updated_at,
+                    (SELECT COUNT(*) FROM messages WHERE thread_id = threads.id) as message_count
+                    FROM threads
+                    ORDER BY updated_at DESC"""
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
-# ── User profile ──────────────────────────────────────────────────────────
+    def switch_thread(self, thread_id: int):
+        """Switch to a different conversation thread."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT id FROM threads WHERE id = ?", (thread_id,)
+            )
+            if cursor.fetchone():
+                self.current_thread_id = thread_id
+                log.info(f"Switched to thread: {thread_id}")
+            else:
+                raise ValueError(f"Thread {thread_id} not found")
 
-def profile_set(key: str, value: str) -> None:
-    with _conn() as con:
-        con.execute(
-            "INSERT INTO profile (key, value) VALUES (?, ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (key, value),
-        )
+    def delete_thread(self, thread_id: int):
+        """Delete a thread and its messages."""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
+            conn.execute("DELETE FROM threads WHERE id = ?", (thread_id,))
+            conn.commit()
+            log.info(f"Deleted thread: {thread_id}")
 
+    def set_preference(self, key: str, value: Any):
+        """Set a user preference."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """INSERT INTO preferences (key, value) VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP""",
+                (key, json.dumps(value))
+            )
+            conn.commit()
 
-def profile_get(key: str, default: Optional[str] = None) -> Optional[str]:
-    with _conn() as con:
-        row = con.execute(
-            "SELECT value FROM profile WHERE key = ?", (key,)
-        ).fetchone()
-    return row["value"] if row else default
+    def get_preference(self, key: str, default: Any = None) -> Any:
+        """Get a user preference."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT value FROM preferences WHERE key = ?", (key,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return json.loads(row["value"])
+            return default
 
+    def search_messages(self, query: str, limit: int = 10) -> List[Dict]:
+        """Search messages by content."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT m.*, t.title as thread_title
+                    FROM messages m
+                    JOIN threads t ON m.thread_id = t.id
+                    WHERE content LIKE ?
+                    ORDER BY m.timestamp DESC
+                    LIMIT ?""",
+                (f"%{query}%", limit)
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
-def profile_all() -> dict[str, str]:
-    with _conn() as con:
-        rows = con.execute("SELECT key, value FROM profile").fetchall()
-    return {r["key"]: r["value"] for r in rows}
+    def clear_thread(self, thread_id: Optional[int] = None):
+        """Clear all messages from a thread."""
+        thread_id = thread_id or self.current_thread_id
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM messages WHERE thread_id = ?", (thread_id,))
+            conn.commit()
+            log.info(f"Cleared thread: {thread_id}")
+
+    def get_stats(self) -> Dict:
+        """Get memory statistics."""
+        with self._get_connection() as conn:
+            stats = {}
+            
+            cursor = conn.execute("SELECT COUNT(*) as count FROM threads")
+            stats["thread_count"] = cursor.fetchone()["count"]
+            
+            cursor = conn.execute("SELECT COUNT(*) as count FROM messages")
+            stats["message_count"] = cursor.fetchone()["count"]
+            
+            cursor = conn.execute(
+                "SELECT COUNT(*) as count FROM messages WHERE role = 'user'"
+            )
+            stats["user_messages"] = cursor.fetchone()["count"]
+            
+            cursor = conn.execute(
+                "SELECT COUNT(*) as count FROM messages WHERE role = 'assistant'"
+            )
+            stats["assistant_messages"] = cursor.fetchone()["count"]
+            
+            return stats
