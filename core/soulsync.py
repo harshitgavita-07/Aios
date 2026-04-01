@@ -201,7 +201,7 @@ class SoulSync:
         if intensity > 0.7:
             confidence = min(confidence + 0.2, 1.0)
         
-        state = EmotionState(primary_emotion, intensity, confidence)
+        state = EmotionState(dominant=primary_emotion, intensity=intensity, confidence=confidence)
         
         # Store current emotion
         self.current_emotion = state
