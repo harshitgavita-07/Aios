@@ -198,46 +198,6 @@ Contributions welcome. Before opening a PR:
 4. UI changes must not block the main thread
 
 ##### See[CONTRIBUTING.md] (CONTRIBUTING.md).
-=======
-    │
-    ▼
-┌─────────────────┐
-│  Mode Controller│  → Detect: Chat / Research / Execute / Reason
-└────────┬────────┘
-         │
-    ┌────┴────┬──────────┬─────────┐
-    ▼         ▼          ▼         ▼
-┌──────┐  ┌──────┐  ┌─────────┐ ┌──────┐
-│Memory│  │ RAG  │  │ Web-RAG │ │Tools │
-│Store │  │Vector│  │Search   │ │Exec  │
-└──┬───┘  │Store │  │Fetch    │ └──┬───┘
-   │      └──────┘  └────┬────┘    │
-   │                     │         │
-   └─────────────────────┴─────────┘
-                    │
-                    ▼
-           ┌─────────────┐
-           │Context Mgr  │  → Build optimal context window
-           └──────┬──────┘
-                  │
-                  ▼
-           ┌─────────────┐
-           │ SoulSync    │  → Emotion detection + Tone adaptation
-           └──────┬──────┘
-                  │
-                  ▼
-           ┌─────────────┐
-           │ LLM (Ollama)│  → Local inference
-           └──────┬──────┘
-                  │
-                  ▼
-           ┌─────────────┐
-           │ Confidence  │  → Quality scoring + Fallback
-           └──────┬──────┘
-                  │
-                  ▼
-            Streaming Response
-```
 
 ---
 
