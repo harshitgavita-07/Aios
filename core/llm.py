@@ -12,7 +12,29 @@ import time
 import ollama
 from ollama import ResponseError
 
-from hardware import detect, recommend_model
+import sys as _sys
+import os as _os
+# hardware.py lives at the repo root, not inside a package.
+# Add the repo root to sys.path so it can be imported regardless of the
+# working directory the user launches AIOS from (fixes Windows CWD issues).
+_repo_root = str(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+if _repo_root not in _sys.path:
+    _sys.path.insert(0, _repo_root)
+
+try:
+    from hardware import detect, recommend_model
+    _HARDWARE_AVAILABLE = True
+except ImportError:
+    _HARDWARE_AVAILABLE = False
+    def detect() -> dict:
+        return {"cpu_cores": _os.cpu_count() or 4, "ram_gb": 8.0,
+                "gpu_name": "", "vram_gb": 0.0, "backend": "cpu"}
+    def recommend_model(hw: dict, available: list) -> str:
+        preferred = ["qwen2.5:7b", "llama3.2:3b", "mistral:7b", "phi3:mini"]
+        for m in preferred:
+            if m in available:
+                return m
+        return available[0] if available else "llama3.2:3b"
 
 log = logging.getLogger("aios.llm")
 
