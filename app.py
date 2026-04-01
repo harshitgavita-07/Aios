@@ -4,7 +4,6 @@ Entry point for the next-generation AIOS.
 """
 
 import sys
-import logging
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication

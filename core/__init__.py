@@ -9,6 +9,6 @@ from .agent import AgentController
 from .memory import MemoryStore
 from .soulsync import SoulSync
 from .planner import Planner
-from .llm import LLMClient
+from llm import LLMClient
 
 __all__ = ["AgentController", "MemoryStore", "SoulSync", "Planner", "LLMClient"]

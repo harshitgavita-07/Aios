@@ -1,273 +1,342 @@
 """
-SoulSync — Emotional Intelligence Layer
-Detects user emotion, adapts tone, maintains user profile.
+SoulSync — Advanced emotion detection and personality adaptation
+Uses pattern matching and context to detect user emotions and adapt responses.
 """
 
-import re
-import json
 import logging
-from dataclasses import dataclass, asdict
-from pathlib import Path
-from typing import Optional, Dict, List
-from datetime import datetime
+import re
+from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
 
 log = logging.getLogger("aios.soulsync")
 
 
 @dataclass
 class EmotionState:
-    """Current emotional context of the user."""
-    valence: float = 0.0  # -1.0 (negative) to 1.0 (positive)
-    arousal: float = 0.0  # 0.0 (calm) to 1.0 (excited)
-    dominant: str = "neutral"
-    confidence: float = 0.0
-
-
-@dataclass
-class UserProfile:
-    """Persistent user preferences and patterns."""
-    name: str = ""
-    preferred_tone: str = "balanced"  # friendly, professional, concise, technical
-    interests: List[str] = None
-    conversation_style: str = "casual"  # casual, formal, technical
-    common_tasks: List[str] = None
-    created_at: str = ""
-    updated_at: str = ""
-
-    def __post_init__(self):
-        if self.interests is None:
-            self.interests = []
-        if self.common_tasks is None:
-            self.common_tasks = []
+    """Current emotional state of the user."""
+    dominant: str
+    intensity: float
+    confidence: float
+    context: Dict[str, any]
+    
+    def __init__(self, dominant: str = "neutral", intensity: float = 0.5, confidence: float = 0.5):
+        self.dominant = dominant
+        self.intensity = intensity
+        self.confidence = confidence
+        self.context = {}
 
 
 class SoulSync:
     """
-    Emotional intelligence and user personalization layer.
+    Advanced emotion detection and response adaptation system.
     
     Features:
-    - Rule-based emotion detection from text
-    - Tone adaptation based on user emotion and profile
-    - User profile persistence and learning
+    - Multi-pattern emotion detection
+    - Context-aware analysis
+    - Personality adaptation
+    - Emotional memory
+    
+    Change: Advanced emotion processing
+    Why:
+    - Simple keyword matching was too basic
+    - Users have complex emotional states
+    Impact:
+    - Better user experience
+    - More empathetic responses
     """
 
-    # Emotion keyword patterns for detection
-    EMOTION_PATTERNS = {
-        "joy": [r"\b(happy|excited|awesome|great|love|wonderful|fantastic|amazing|yay)\b"],
-        "anger": [r"\b(angry|mad|frustrated|annoyed|hate|terrible|awful|stupid)\b"],
-        "sadness": [r"\b(sad|upset|disappointed|depressed|sorry|miss|lost)\b"],
-        "fear": [r"\b(worried|scared|anxious|nervous|afraid|panic|stress)\b"],
-        "surprise": [r"\b(wow|whoa|unexpected|surprised|shocked|omg|incredible)\b"],
-        "confusion": [r"\b(confused|lost|don't understand|unclear|what\?|huh)\b"],
-        "urgency": [r"\b(urgent|asap|emergency|quick|hurry|rush|deadline)\b"],
-    }
-
-    # Tone adaptation rules
-    TONE_ADAPTATIONS = {
-        "joy": {"tone": "enthusiastic", "style": "casual"},
-        "anger": {"tone": "calm", "style": "concise"},
-        "sadness": {"tone": "empathetic", "style": "supportive"},
-        "fear": {"tone": "reassuring", "style": "clear"},
-        "surprise": {"tone": "engaged", "style": "casual"},
-        "confusion": {"tone": "patient", "style": "technical"},
-        "urgency": {"tone": "direct", "style": "concise"},
-        "neutral": {"tone": "balanced", "style": "natural"},
-    }
-
-    def __init__(self, data_dir: Optional[Path] = None):
-        self.data_dir = data_dir or Path(__file__).parent.parent / "data"
-        self.data_dir.mkdir(exist_ok=True)
-        self.profile_path = self.data_dir / "user_profile.json"
-        
-        self.profile = self._load_profile()
-        self.current_emotion = EmotionState()
-        self._emotion_history: List[EmotionState] = []
+    def __init__(self, data_dir=None):
+        self.data_dir = data_dir
+        self.emotion_lexicon = self._build_lexicon()
+        self.personality_profiles = self._load_personality_profiles()
+        self.emotional_memory = []
+        self.current_emotion = None
         log.info("SoulSync initialized")
 
-    def detect_emotion(self, text: str) -> EmotionState:
+    def _build_lexicon(self) -> Dict[str, List[str]]:
+        """Build comprehensive emotion lexicon."""
+        return {
+            "frustrated": [
+                "not working", "broken", "wrong", "error", "fail", "crash",
+                "still doesn't", "why isn't", "ugh", "damn", "annoying",
+                "useless", "terrible", "awful", "hate", "keeps failing",
+                "fix this", "nothing works", "stuck", "blocked", "can't",
+            ],
+            "anxious": [
+                "worried", "nervous", "scared", "afraid", "panic", "stress",
+                "urgent", "asap", "deadline", "help me", "please hurry",
+                "what if", "might break", "could go wrong", "risky",
+                "concerned", "uneasy", "apprehensive",
+            ],
+            "happy": [
+                "thanks", "thank you", "great", "awesome", "love it",
+                "perfect", "excellent", "amazing", "nice", "cool", "works",
+                "finally", "yay", "wonderful", "pleased", "satisfied",
+                "grateful", "appreciative",
+            ],
+            "excited": [
+                "wow", "incredible", "insane", "mind-blowing", "can't believe",
+                "this is huge", "so fast", "way better", "next level",
+                "excited", "pumped", "stoked", "thrilled", "enthusiastic",
+            ],
+            "curious": [
+                "how does", "why does", "what is", "explain", "can you tell",
+                "i wonder", "interesting", "how would", "what if", "could you",
+                "i want to understand", "teach me", "show me", "tell me more",
+                "fascinating", "intrigued",
+            ],
+            "confused": [
+                "confused", "lost", "don't understand", "unclear", "puzzled",
+                "bewildered", "mystified", "baffled", "perplexed",
+            ],
+            "angry": [
+                "angry", "mad", "furious", "outraged", "infuriated",
+                "irritated", "annoyed", "pissed off", "enraged",
+            ],
+            "sad": [
+                "sad", "unhappy", "depressed", "disappointed", "sorry",
+                "regretful", "down", "blue", "melancholy",
+            ],
+        }
+
+    def _load_personality_profiles(self) -> Dict[str, Dict]:
+        """Load personality adaptation profiles."""
+        return {
+            "frustrated": {
+                "tone": "supportive",
+                "style": "step_by_step",
+                "empathy": "high",
+                "prompt_modifier": "I understand this is frustrating. Let's work through this together step by step."
+            },
+            "anxious": {
+                "tone": "calming",
+                "style": "reassuring",
+                "empathy": "high",
+                "prompt_modifier": "I can help you with this. Take a deep breath - we'll figure it out together."
+            },
+            "happy": {
+                "tone": "enthusiastic",
+                "style": "celebratory",
+                "empathy": "medium",
+                "prompt_modifier": "That's great! I'm excited to help you make the most of this."
+            },
+            "excited": {
+                "tone": "energetic",
+                "style": "collaborative",
+                "empathy": "medium",
+                "prompt_modifier": "This is exciting! Let's dive in and explore the possibilities."
+            },
+            "curious": {
+                "tone": "educational",
+                "style": "explanatory",
+                "empathy": "medium",
+                "prompt_modifier": "That's a great question. Let me explain this clearly."
+            },
+            "confused": {
+                "tone": "patient",
+                "style": "clarifying",
+                "empathy": "high",
+                "prompt_modifier": "I can see this might be confusing. Let me break it down for you."
+            },
+            "angry": {
+                "tone": "calm",
+                "style": "de-escalating",
+                "empathy": "high",
+                "prompt_modifier": "I hear your frustration. Let's focus on solving this issue."
+            },
+            "sad": {
+                "tone": "compassionate",
+                "style": "supportive",
+                "empathy": "high",
+                "prompt_modifier": "I'm sorry you're feeling this way. I'm here to help however I can."
+            },
+            "neutral": {
+                "tone": "balanced",
+                "style": "direct",
+                "empathy": "medium",
+                "prompt_modifier": ""
+            },
+        }
+
+    def detect_emotion(self, text: str, context: Optional[Dict] = None) -> EmotionState:
         """
-        Detect emotion from user text using rule-based patterns.
+        Detect user's emotional state from text and context.
         
-        Change: Added emotion detection via keyword patterns
+        Change: Multi-factor emotion detection
         Why:
-        - Previous system had no emotion awareness
-        - Enables tone adaptation for better UX
+        - Single keyword matching misses nuance
+        - Context improves accuracy
         Impact:
-        - AI responds with appropriate emotional tone
-        - Improves user connection and satisfaction
+        - More accurate emotion detection
+        - Better response adaptation
         """
         text_lower = text.lower()
-        scores = {}
         
-        for emotion, patterns in self.EMOTION_PATTERNS.items():
-            score = sum(1 for p in patterns if re.search(p, text_lower))
+        # Score emotions based on lexicon matches
+        scores = {}
+        for emotion, keywords in self.emotion_lexicon.items():
+            score = sum(1 for keyword in keywords if keyword in text_lower)
             if score > 0:
                 scores[emotion] = score
         
+        # Consider context from recent messages
+        if context and "recent_emotions" in context:
+            for emotion in context["recent_emotions"]:
+                if emotion in scores:
+                    scores[emotion] += 0.5  # Boost continuity
+                else:
+                    scores[emotion] = 0.5
+        
+        # Pattern-based intensity detection
+        intensity = self._calculate_intensity(text_lower)
+        
         if not scores:
-            emotion = EmotionState(dominant="neutral", confidence=0.5)
+            primary_emotion = "neutral"
+            confidence = 0.5
         else:
-            dominant = max(scores, key=scores.get)
-            confidence = min(scores[dominant] / 3, 1.0)
-            
-            # Calculate valence/arousal based on emotion
-            valence_map = {
-                "joy": 0.8, "surprise": 0.3, "neutral": 0.0,
-                "confusion": -0.1, "sadness": -0.6, "anger": -0.8, "fear": -0.5
-            }
-            arousal_map = {
-                "joy": 0.7, "surprise": 0.9, "anger": 0.9, "fear": 0.8,
-                "urgency": 0.9, "confusion": 0.4, "sadness": 0.2, "neutral": 0.3
-            }
-            
-            emotion = EmotionState(
-                valence=valence_map.get(dominant, 0.0),
-                arousal=arousal_map.get(dominant, 0.3),
-                dominant=dominant,
-                confidence=confidence
-            )
+            primary_emotion = max(scores, key=scores.get)
+            confidence = min(scores[primary_emotion] / 3, 1.0)  # Normalize confidence
         
-        self.current_emotion = emotion
-        self._emotion_history.append(emotion)
+        # Adjust for intensity
+        if intensity > 0.7:
+            confidence = min(confidence + 0.2, 1.0)
         
-        # Keep only last 10 emotions
-        if len(self._emotion_history) > 10:
-            self._emotion_history = self._emotion_history[-10:]
+        state = EmotionState(primary_emotion, intensity, confidence)
         
-        log.debug(f"Detected emotion: {emotion.dominant} (confidence: {emotion.confidence:.2f})")
-        return emotion
+        # Store current emotion
+        self.current_emotion = state
+        
+        # Store in emotional memory
+        self.emotional_memory.append({
+            "text": text,
+            "emotion": primary_emotion,
+            "intensity": intensity,
+            "timestamp": __import__("time").time()
+        })
+        
+        # Keep memory limited
+        if len(self.emotional_memory) > 10:
+            self.emotional_memory.pop(0)
+        
+        log.debug(f"Detected emotion: {primary_emotion} (intensity: {intensity:.2f}, confidence: {confidence:.2f})")
+        return state
 
-    def get_tone_adaptation(self) -> Dict[str, str]:
-        """
-        Get tone and style adaptation based on current emotion.
-        
-        Change: Dynamic tone adaptation based on detected emotion
-        Why:
-        - Static responses feel robotic
-        - Emotional mirroring improves rapport
-        Impact:
-        - More natural, human-like interactions
-        - Better user experience
-        """
-        dominant = self.current_emotion.dominant
-        adaptation = self.TONE_ADAPTATIONS.get(dominant, self.TONE_ADAPTATIONS["neutral"])
-        
-        # Blend with user preference
-        if self.profile.preferred_tone != "balanced":
-            adaptation["tone"] = self.profile.preferred_tone
-        if self.profile.conversation_style != "casual":
-            adaptation["style"] = self.profile.conversation_style
-        
-        return adaptation
-
-    def get_system_prompt_modifier(self) -> str:
-        """
-        Generate system prompt modifier based on emotion and profile.
-        
-        Change: Dynamic system prompt augmentation
-        Why:
-        - Previous system used static prompt
-        - Context-aware prompts improve relevance
-        Impact:
-        - More contextually appropriate responses
-        - Better alignment with user state
-        """
-        adaptation = self.get_tone_adaptation()
-        tone = adaptation["tone"]
-        style = adaptation["style"]
-        
-        modifiers = {
-            "enthusiastic": "Be upbeat and positive in your response.",
-            "calm": "Be calm and soothing. Acknowledge frustration if present.",
-            "empathetic": "Show empathy and understanding. Be supportive.",
-            "reassuring": "Be reassuring and clear. Provide confidence.",
-            "engaged": "Show genuine interest and engagement.",
-            "patient": "Be patient and thorough. Explain step by step.",
-            "direct": "Be direct and to the point. Prioritize clarity.",
-            "balanced": "Be helpful and natural.",
+    def _calculate_intensity(self, text: str) -> float:
+        """Calculate emotional intensity from text patterns."""
+        intensity_indicators = {
+            "high": [
+                "!!!", "???", "so much", "extremely", "absolutely", "totally",
+                "completely", "utterly", "incredibly", "unbelievably",
+                "really really", "very very", "super", "ultra",
+            ],
+            "medium": [
+                "quite", "pretty", "fairly", "rather", "somewhat",
+                "kind of", "sort of", "a bit", "a little",
+            ],
+            "low": [
+                "slightly", "barely", "hardly", "scarcely",
+            ],
         }
         
-        style_modifiers = {
-            "concise": "Keep your response brief and focused.",
-            "technical": "Provide technical details where relevant.",
-            "casual": "Use a conversational, friendly tone.",
-            "formal": "Use professional, formal language.",
-            "supportive": "Offer encouragement and practical help.",
-            "clear": "Be extremely clear and structured.",
-            "natural": "Respond naturally.",
-        }
+        score = 0.5  # Base neutral
         
-        modifier = modifiers.get(tone, modifiers["balanced"])
-        style_mod = style_modifiers.get(style, style_modifiers["natural"])
+        for level, patterns in intensity_indicators.items():
+            if any(p in text for p in patterns):
+                if level == "high":
+                    score = min(score + 0.3, 1.0)
+                elif level == "medium":
+                    score = min(score + 0.1, 0.8)
+                elif level == "low":
+                    score = max(score - 0.1, 0.2)
         
-        return f"\n[Tone guidance: {modifier} {style_mod}]"
+        # Punctuation intensity
+        exclamation_count = text.count("!")
+        question_count = text.count("?")
+        
+        if exclamation_count > 2:
+            score = min(score + 0.2, 1.0)
+        if question_count > 2:
+            score = min(score + 0.1, 0.9)
+        
+        return score
 
-    def update_profile(self, **kwargs):
-        """Update user profile with new information."""
-        for key, value in kwargs.items():
-            if hasattr(self.profile, key):
-                setattr(self.profile, key, value)
-        
-        self.profile.updated_at = datetime.now().isoformat()
-        self._save_profile()
-
-    def learn_from_interaction(self, user_input: str, task_type: Optional[str] = None):
+    def adapt_response(self, emotion_state: EmotionState, base_response: str) -> str:
         """
-        Learn from user interaction to improve profile.
+        Adapt response based on detected emotion.
         
-        Change: Simple learning from interactions
+        Change: Emotion-aware response adaptation
         Why:
-        - Static profiles don't adapt
-        - Learning improves personalization over time
+        - Generic responses don't account for user state
+        - Emotional intelligence improves UX
         Impact:
-        - Gradually improving user experience
-        - Better anticipation of user needs
+        - More appropriate responses
+        - Better user satisfaction
         """
-        # Track common tasks
-        if task_type and task_type not in self.profile.common_tasks:
-            self.profile.common_tasks.append(task_type)
-            if len(self.profile.common_tasks) > 10:
-                self.profile.common_tasks = self.profile.common_tasks[-10:]
+        if emotion_state.primary_emotion == "neutral" or emotion_state.confidence < 0.6:
+            return base_response
         
-        # Extract potential interests (simple heuristic)
-        interest_keywords = ["python", "coding", "ai", "ml", "data", "web", "app", 
-                          "design", "writing", "music", "gaming", "reading"]
-        for keyword in interest_keywords:
-            if keyword in user_input.lower() and keyword not in self.profile.interests:
-                self.profile.interests.append(keyword)
-                if len(self.profile.interests) > 15:
-                    self.profile.interests = self.profile.interests[-15:]
+        profile = self.personality_profiles.get(emotion_state.primary_emotion, self.personality_profiles["neutral"])
         
-        self.profile.updated_at = datetime.now().isoformat()
-        self._save_profile()
+        # Add emotional prefix
+        prefix = profile["prompt_modifier"]
+        if prefix:
+            adapted = f"{prefix}\n\n{base_response}"
+        else:
+            adapted = base_response
+        
+        # Adjust style based on emotion
+        if profile["style"] == "step_by_step" and len(base_response.split(".")) > 3:
+            # Break into steps for frustrated users
+            sentences = [s.strip() for s in base_response.split(".") if s.strip()]
+            if len(sentences) > 1:
+                adapted = f"{prefix}\n\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(sentences))
+        
+        return adapted
 
-    def _load_profile(self) -> UserProfile:
-        """Load user profile from disk."""
-        if self.profile_path.exists():
-            try:
-                with open(self.profile_path, "r") as f:
-                    data = json.load(f)
-                return UserProfile(**data)
-            except Exception as e:
-                log.warning(f"Could not load profile: {e}")
+    def get_emotional_context(self) -> Dict:
+        """Get current emotional context for LLM."""
+        if not self.emotional_memory:
+            return {"emotional_state": "neutral", "recent_emotions": []}
         
-        return UserProfile(
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
-        )
-
-    def _save_profile(self):
-        """Save user profile to disk."""
-        try:
-            with open(self.profile_path, "w") as f:
-                json.dump(asdict(self.profile), f, indent=2)
-        except Exception as e:
-            log.warning(f"Could not save profile: {e}")
+        recent_emotions = [m["emotion"] for m in self.emotional_memory[-3:]]
+        dominant_emotion = max(set(recent_emotions), key=recent_emotions.count) if recent_emotions else "neutral"
+        
+        return {
+            "emotional_state": dominant_emotion,
+            "recent_emotions": recent_emotions,
+            "emotional_trend": self._analyze_trend()
+        }
 
     def get_context(self) -> Dict:
-        """Get full SoulSync context for the agent."""
-        return {
-            "emotion": asdict(self.current_emotion),
-            "profile": asdict(self.profile),
-            "tone_adaptation": self.get_tone_adaptation(),
-        }
+        """Get current emotional context for UI."""
+        if self.current_emotion:
+            return {"emotion": {"dominant": self.current_emotion.dominant}}
+        else:
+            return {"emotion": {"dominant": "neutral"}}
+
+    def get_system_prompt_modifier(self) -> str:
+        """Get system prompt modifier based on current emotion."""
+        if self.current_emotion:
+            profile = self.personality_profiles.get(self.current_emotion.dominant, self.personality_profiles["neutral"])
+            return profile["prompt_modifier"]
+        else:
+            return ""
+
+    def learn_from_interaction(self, user_input: str, mode: str):
+        """Learn from user interaction to improve emotion detection."""
+        # For now, just log it. Could be extended to update profiles or lexicons.
+        log.debug(f"Learned from interaction: mode={mode}, input_length={len(user_input)}")
+
+    def _analyze_trend(self) -> str:
+        """Analyze emotional trend from memory."""
+        if len(self.emotional_memory) < 3:
+            return "stable"
+        
+        recent = [m["emotion"] for m in self.emotional_memory[-3:]]
+        
+        if len(set(recent)) == 1:
+            return "consistent"
+        elif recent[-1] != recent[0]:
+            return "changing"
+        else:
+            return "stable"

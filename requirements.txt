@@ -1,20 +1,24 @@
 # AIOS v2.0 — Core Dependencies
-# Install with: pip install -r requirements.txt
 
 # Qt UI Framework
 PySide6>=6.7.0
 
-# LLM Integration (Ollama must also be installed separately: https://ollama.ai)
+# LLM Integration
 ollama>=0.4.0
 
 # System Information
 psutil>=5.9.0
 
-# RAG Components (required for knowledge retrieval)
+# RAG Components (optional but recommended)
+# For local embeddings and vector search:
 sentence-transformers>=2.2.0
 faiss-cpu>=1.7.0
 numpy>=1.24.0
 
-# Web content fetching (for RAG web search)
-requests>=2.31.0
-beautifulsoup4>=4.12.0
+# Optional: Enhanced GPU profiling
+# pip install pyaccelerate
+
+# Development dependencies (uncomment for dev)
+# pytest>=7.0.0
+# black>=23.0.0
+# pylint>=2.17.0
