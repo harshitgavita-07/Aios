@@ -3,6 +3,7 @@ Aios v2.0 — Local AI Runtime
 Entry point for the next-generation AIOS.
 """
 
+import logging
 import sys
 from pathlib import Path
 
