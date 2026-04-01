@@ -50,6 +50,21 @@ def process(user_input: str) -> Generator[str, None, None]:
     text = user_input.strip()
     if not text:
         return
+    
+    # Handle very short inputs (greetings, etc.)
+    if len(text) < 3:
+        greeting_responses = [
+            "Hello! How can I help you today?",
+            "Hi there! What would you like to chat about?",
+            "Hey! I'm here to help. What's on your mind?",
+            "Greetings! How can I assist you?"
+        ]
+        import random
+        response = random.choice(greeting_responses)
+        memory.save(_session_id, "user", text)
+        memory.save(_session_id, "assistant", response)
+        yield response
+        return
 
     # 1. Plan
     plan = planner_mod.plan(text)
@@ -385,12 +400,31 @@ class AgentController:
         - Better perceived performance
         """
         try:
+            text = user_input.strip()
+            if not text:
+                return
+            
+            # Handle very short inputs (greetings, etc.)
+            if len(text) < 3:
+                greeting_responses = [
+                    "Hello! How can I help you today?",
+                    "Hi there! What would you like to chat about?",
+                    "Hey! I'm here to help. What's on your mind?",
+                    "Greetings! How can I assist you?"
+                ]
+                import random
+                response = random.choice(greeting_responses)
+                self.memory.add_message("assistant", response, metadata={"emotion": "neutral"})
+                yield {"type": "token", "content": response}
+                yield {"type": "complete", "confidence": "HIGH"}
+                return
+            
             yield {"type": "thinking", "message": "Analyzing request..."}
             
             # Save and detect
-            self.memory.add_message("user", user_input)
-            emotion = self.soulsync.detect_emotion(user_input)
-            mode_decision = self.mode_controller.detect_mode(user_input)
+            self.memory.add_message("user", text)
+            emotion = self.soulsync.detect_emotion(text)
+            mode_decision = self.mode_controller.detect_mode(text)
             
             yield {"type": "mode", "mode": mode_decision.mode.value}
             
