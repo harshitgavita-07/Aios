@@ -324,12 +324,10 @@ MIT
 
 <div align="center">
 
-<<<<<<< HEAD
 Built by [Harshit Gavita](https://github.com/harshitgavita-07)
 
-*Your AI. Your machine. Your data.*
+***Your AI. Your machine. Your data.****
 =======
 **Built for the local AI future.**
->>>>>>> main
 
 </div>
