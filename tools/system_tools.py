@@ -314,19 +314,264 @@ class SystemTools:
         
         return json.dumps(info, indent=2)
 
-    def _is_path_allowed(self, path: Path) -> bool:
-        """Check if path is within allowed directories."""
+    def run_command(self, payload: Any) -> str:
+        """
+        Run a system command safely.
+        
+        Change: Safe command execution
+        Why:
+        - Users need to run system commands
+        - Must prevent dangerous operations
+        Impact:
+        - Controlled system access
+        - Safe command execution
+        """
+        command = ""
+        if isinstance(payload, dict):
+            command = payload.get("command", "")
+        elif isinstance(payload, str):
+            command = payload
+        
+        if not command:
+            return json.dumps({"error": "No command provided"})
+        
+        # Dangerous commands blacklist
+        dangerous = [
+            "rm ", "del ", "format ", "fdisk", "mkfs", "dd ", "shutdown",
+            "reboot", "halt", "poweroff", "sudo ", "su ", "chmod 777",
+            "chown root", "passwd", "usermod", "userdel", "groupmod"
+        ]
+        
+        command_lower = command.lower()
+        for bad in dangerous:
+            if bad in command_lower:
+                return json.dumps({"error": f"Dangerous command blocked: {bad.strip()}"})
+        
         try:
-            resolved = path.resolve()
-            for allowed in self.allowed_dirs:
+            import subprocess
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=str(Path.home())
+            )
+            
+            return json.dumps({
+                "command": command,
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+        except subprocess.TimeoutExpired:
+            return json.dumps({"error": "Command timed out after 30 seconds"})
+        except Exception as e:
+            return json.dumps({"error": f"Command execution error: {str(e)}"})
+
+    def open_application(self, payload: Any) -> str:
+        """
+        Open an application or file.
+        
+        Change: Application launching
+        Why:
+        - Users want to open programs/files
+        - Convenient computer control
+        Impact:
+        - Application management
+        - File opening capability
+        """
+        target = ""
+        if isinstance(payload, dict):
+            target = payload.get("target", "")
+        elif isinstance(payload, str):
+            target = payload
+        
+        if not target:
+            return json.dumps({"error": "No target provided"})
+        
+        try:
+            import subprocess
+            import platform
+            
+            if platform.system() == "Windows":
+                # Windows
+                result = subprocess.run(
+                    ["start", target],
+                    shell=True,
+                    capture_output=True,
+                    text=True
+                )
+            elif platform.system() == "Darwin":
+                # macOS
+                result = subprocess.run(
+                    ["open", target],
+                    capture_output=True,
+                    text=True
+                )
+            else:
+                # Linux
+                result = subprocess.run(
+                    ["xdg-open", target],
+                    capture_output=True,
+                    text=True
+                )
+            
+            return json.dumps({
+                "action": "open_application",
+                "target": target,
+                "success": result.returncode == 0,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+        except Exception as e:
+            return json.dumps({"error": f"Application open error: {str(e)}"})
+
+    def take_screenshot(self, payload: Any) -> str:
+        """
+        Take a screenshot and save it.
+        
+        Change: Screenshot capability
+        Why:
+        - Users need visual capture
+        - Helpful for documentation
+        Impact:
+        - Visual capture tool
+        - Screen recording capability
+        """
+        filename = ""
+        if isinstance(payload, dict):
+            filename = payload.get("filename", "")
+        elif isinstance(payload, str):
+            filename = payload or "screenshot.png"
+        
+        if not filename:
+            filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        
+        try:
+            from PIL import ImageGrab
+            import platform
+            
+            # Take screenshot
+            screenshot = ImageGrab.grab()
+            
+            # Save to allowed directory
+            save_path = self.allowed_dirs[0] / filename
+            screenshot.save(str(save_path))
+            
+            return json.dumps({
+                "action": "screenshot",
+                "filename": filename,
+                "path": str(save_path),
+                "size": screenshot.size,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+        except ImportError:
+            return json.dumps({"error": "PIL not installed. Install with: pip install pillow"})
+        except Exception as e:
+            return json.dumps({"error": f"Screenshot error: {str(e)}"})
+
+    def get_running_processes(self, payload: Any) -> str:
+        """
+        Get list of running processes.
+        
+        Change: Process monitoring
+        Why:
+        - Users need system monitoring
+        - Process management capability
+        Impact:
+        - System monitoring tool
+        - Process visibility
+        """
+        try:
+            if not PSUTIL_AVAILABLE:
+                return json.dumps({"error": "psutil not installed"})
+            
+            processes = []
+            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
                 try:
-                    if resolved.is_relative_to(allowed.resolve()):
-                        return True
-                except ValueError:
+                    info = proc.info
+                    processes.append({
+                        "pid": info['pid'],
+                        "name": info['name'],
+                        "cpu_percent": round(info['cpu_percent'], 1),
+                        "memory_percent": round(info['memory_percent'], 1)
+                    })
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
-            return False
-        except Exception:
-            return False
+            
+            # Sort by CPU usage
+            processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
+            
+            return json.dumps({
+                "processes": processes[:20],  # Top 20
+                "total_count": len(processes),
+                "timestamp": datetime.now().isoformat()
+            })
+            
+        except Exception as e:
+            return json.dumps({"error": f"Process list error: {str(e)}"})
+
+    def control_window(self, payload: Any) -> str:
+        """
+        Control application windows (minimize, maximize, close).
+        
+        Change: Window management
+        Why:
+        - Users need window control
+        - Computer automation capability
+        Impact:
+        - Window management tool
+        - Desktop automation
+        """
+        action = ""
+        window_title = ""
+        
+        if isinstance(payload, dict):
+            action = payload.get("action", "")
+            window_title = payload.get("window_title", "")
+        else:
+            return json.dumps({"error": "Payload must be dict with 'action' and 'window_title'"})
+        
+        if not action or not window_title:
+            return json.dumps({"error": "Both 'action' and 'window_title' required"})
+        
+        try:
+            import pygetwindow as gw
+            
+            windows = gw.getWindowsWithTitle(window_title)
+            if not windows:
+                return json.dumps({"error": f"No window found with title: {window_title}"})
+            
+            window = windows[0]  # Take first match
+            
+            if action == "minimize":
+                window.minimize()
+            elif action == "maximize":
+                window.maximize()
+            elif action == "restore":
+                window.restore()
+            elif action == "close":
+                window.close()
+            elif action == "focus":
+                window.activate()
+            else:
+                return json.dumps({"error": f"Unknown action: {action}"})
+            
+            return json.dumps({
+                "action": action,
+                "window_title": window_title,
+                "success": True,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+        except ImportError:
+            return json.dumps({"error": "pygetwindow not installed. Install with: pip install pygetwindow"})
+        except Exception as e:
+            return json.dumps({"error": f"Window control error: {str(e)}"})
 
     def get_tools_dict(self) -> Dict[str, callable]:
         """Get all tools as a dictionary for registration."""
@@ -337,4 +582,9 @@ class SystemTools:
             "file_write": self.file_write,
             "list_directory": self.list_directory,
             "system_info": self.system_info,
+            "run_command": self.run_command,
+            "open_application": self.open_application,
+            "take_screenshot": self.take_screenshot,
+            "get_running_processes": self.get_running_processes,
+            "control_window": self.control_window,
         }

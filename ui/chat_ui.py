@@ -26,7 +26,7 @@ class StreamWorker(QThread):
     token_signal = Signal(str)
     thinking_signal = Signal(str)
     mode_signal = Signal(str)
-    sources_signal = Signal(int)
+    sources_signal = Signal(dict)  # sources data dict
     complete_signal = Signal(str)
     error_signal = Signal(str)
 
@@ -34,6 +34,7 @@ class StreamWorker(QThread):
         super().__init__()
         self.agent = agent
         self.user_input = user_input
+        self.current_sources = []
 
     def run(self):
         try:
@@ -45,7 +46,7 @@ class StreamWorker(QThread):
                 elif update["type"] == "mode":
                     self.mode_signal.emit(update["mode"])
                 elif update["type"] == "sources":
-                    self.sources_signal.emit(update["count"])
+                    self.sources_signal.emit(update.get("data", {"count": 0, "sources": []}))
                 elif update["type"] == "complete":
                     self.complete_signal.emit(update["confidence"])
                 elif update["type"] == "error":
@@ -528,9 +529,39 @@ class ChatWindow(QWidget):
         emoji = mode_emoji.get(mode, "💬")
         self.mode_label.setText(f"{emoji} {mode.title()}")
 
-    def _on_sources(self, count: int):
+    def _on_sources(self, sources_data: dict):
         """Show sources found."""
-        self.sources_list.addItem(f"📄 {count} web sources")
+        count = sources_data.get("count", 0)
+        sources = sources_data.get("sources", [])
+        
+        self.sources_list.clear()
+        self.sources_list.addItem(f"📄 {count} sources found")
+        
+        if sources:
+            self.worker.current_sources = sources
+            for source in sources[:5]:  # Show top 5
+                title = source.get('title', 'Unknown')
+                url = source.get('url', 'N/A')
+                self.sources_list.addItem(f"• {title[:50]}...")
+                self.sources_list.addItem(f"  🔗 {url}")
+
+    def _on_source_details(self, source_data: Dict):
+        """Show detailed source information."""
+        if not source_data:
+            return
+            
+        title = source_data.get('title', 'Unknown Source')
+        url = source_data.get('url', 'N/A')
+        snippet = source_data.get('snippet', 'No preview available')
+        
+        details = f"""
+        <b>Source:</b> {title}<br>
+        <b>URL:</b> <a href="{url}" style="color: #3b82f6;">{url}</a><br>
+        <b>Preview:</b> {snippet[:200]}...
+        """
+        
+        # Could show in a popup or dedicated panel
+        self._append_message("system", f"Source details: {details}")
 
     def _on_complete(self, confidence: str):
         """Handle completion."""

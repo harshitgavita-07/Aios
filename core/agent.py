@@ -141,7 +141,7 @@ def _handle_system(plan: planner_mod.Plan) -> str:
         return "\n".join(lines)
 
     if action == "help":
-        return (
+        help_text = (
             "Aios v2 — what I can do:\n"
             "  • Answer questions and have conversations\n"
             "  • Remember what we've discussed this session\n"
@@ -149,7 +149,28 @@ def _handle_system(plan: planner_mod.Plan) -> str:
             "  • 'list models' — show installed models\n"
             "  • 'show hardware' — display GPU/CPU info\n"
             "  • 'think about X' — structured reasoning step\n"
+            "  • Computer control: run commands, open apps, take screenshots\n"
+            "  • File operations: read/write files in allowed directories\n"
+            "  • System monitoring: check processes, system info\n"
         )
+        
+        # Add gstack skills if available
+        if self.gstack and self.gstack.available:
+            help_text += "\n  • gstack skills available (use /skill-name)"
+        
+        return help_text
+
+    # Handle gstack commands
+    if action.startswith("gstack-") or action.startswith("/"):
+        if self.gstack:
+            skill_name = action.replace("gstack-", "").lstrip("/")
+            try:
+                result = self.gstack.run(f"/{skill_name}", plan.payload or user_input)
+                return f"gstack {skill_name}: {result.content}"
+            except Exception as e:
+                return f"gstack error: {e}"
+        else:
+            return "gstack not available. Install gstack for role-based skills."
 
     return f"[system: {action}]"
 
@@ -245,6 +266,15 @@ class AgentController:
         
         # Initialize RAG pipeline
         self.rag = RAGPipeline(self.data_dir)
+        
+        # Initialize gstack runner
+        try:
+            from gstack.aios_gstack import GStackRunner
+            self.gstack = GStackRunner()
+            log.info("gstack integration initialized")
+        except ImportError:
+            self.gstack = None
+            log.warning("gstack not available - install gstack for role-based skills")
         
         # Tool executor (set later)
         self.tool_executor = None
@@ -435,8 +465,8 @@ class AgentController:
             if mode_decision.requires_web:
                 yield {"type": "thinking", "message": "🔍 Searching web..."}
                 rag_results = self.rag.research(user_input)
-                yield {"type": "sources", "count": len(rag_results)}
-                web_results = [{"content": r["content"], "source": r.get("url", "")} 
+                yield {"type": "sources", "data": {"count": len(rag_results), "sources": rag_results[:5]}}
+                web_results = [{"content": r["content"], "source": r.get("url", ""), "title": r.get("title", "")} 
                               for r in rag_results[:3]]
             
             # Build context and generate

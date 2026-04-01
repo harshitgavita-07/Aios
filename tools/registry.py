@@ -12,7 +12,19 @@ from typing import Callable
 log = logging.getLogger("aios.tools")
 
 # Whitelisted tool names — must be registered explicitly
-_WHITELIST: set[str] = {"think_tool"}
+_WHITELIST: set[str] = {
+    "think_tool",
+    "calculator",
+    "file_read", 
+    "file_write",
+    "list_directory",
+    "system_info",
+    "run_command",
+    "open_application",
+    "take_screenshot",
+    "get_running_processes",
+    "control_window"
+}
 
 
 class ToolRegistry:
@@ -27,6 +39,18 @@ class ToolRegistry:
             self._tools["think_tool"] = run_think
         except Exception as e:
             log.warning("Could not register think_tool: %s", e)
+        
+        # Register system tools
+        try:
+            from tools.system_tools import SystemTools
+            system_tools = SystemTools()
+            tool_dict = system_tools.get_tools_dict()
+            for name, func in tool_dict.items():
+                if name in _WHITELIST:
+                    self._tools[name] = func
+                    log.info("Registered system tool: %s", name)
+        except Exception as e:
+            log.warning("Could not register system tools: %s", e)
 
     def register(self, name: str, fn: Callable) -> None:
         """Register a new tool. Name must be in the whitelist."""
