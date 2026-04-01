@@ -1,4 +1,31 @@
 ﻿__pycache__/
 *.pyc
 *.pyo
+*.pyd
+
+# Database files
+data/*.db
+data/*.db-journal
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
 
