@@ -318,7 +318,6 @@ See `CONTRIBUTING.md` for guidelines.
 ## License
 
 MIT
->>>>>>> main
 
 ---
 
@@ -326,7 +325,7 @@ MIT
 
 Built by [Harshit Gavita](https://github.com/harshitgavita-07)
 
-***Your AI. Your machine. Your data.****
+***Your AI. Your machine. Your data.***
 =======
 **Built for the local AI future.**
 
