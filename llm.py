@@ -209,7 +209,7 @@ class LLMClient:
             ollama.chat(
                 model=self._selected_model,
                 messages=[{"role": "user", "content": "Hi"}],
-                options={"temperature": 0}
+                options={"temperature": 0.3}
             )
             log.info("Model warm-up complete")
         except Exception as e:
@@ -285,7 +285,7 @@ class LLMClient:
             response = ollama.chat(
                 model=self._selected_model,
                 messages=messages,
-                options={"temperature": 0.7}
+                options={"temperature": 0.3, "num_predict": 512}
             )
             result = response.message.content or ""
             
@@ -319,7 +319,7 @@ class LLMClient:
                 model=self._selected_model,
                 messages=messages,
                 stream=True,
-                options={"temperature": 0.7}
+                options={"temperature": 0.3, "num_predict": 512}
             )
             
             for chunk in stream:
