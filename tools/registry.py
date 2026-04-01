@@ -1,25 +1,55 @@
-import importlib
-import pkgutil
-import os
+"""
+Aios tool registry — whitelist-only tool execution.
+
+Only tools explicitly registered here can be called. No dynamic
+discovery of arbitrary modules — safety by design.
+"""
+
+import json
+import logging
+from typing import Callable
+
+log = logging.getLogger("aios.tools")
+
+# Whitelisted tool names — must be registered explicitly
+_WHITELIST: set[str] = {"think_tool"}
+
 
 class ToolRegistry:
     def __init__(self):
-        self.tools = {}
-        self.discover_tools()
+        self._tools: dict[str, Callable] = {}
+        self._register_defaults()
 
-    def discover_tools(self):
-        package_dir = os.path.dirname(__file__)
-        for _, module_name, _ in pkgutil.iter_modules([package_dir]):
-            if module_name.startswith('_'):
-                continue
-            module = importlib.import_module(f'.{module_name}', package=__name__)
-            # Expect each module to expose a ``run`` function
-            if hasattr(module, 'run_think'):
-                self.tools[module_name] = module.run_think
-            elif hasattr(module, 'run'):
-                self.tools[module_name] = module.run
+    def _register_defaults(self) -> None:
+        """Register all whitelisted built-in tools."""
+        try:
+            from tools.think_tool import run_think
+            self._tools["think_tool"] = run_think
+        except Exception as e:
+            log.warning("Could not register think_tool: %s", e)
 
-    def run(self, name, payload):
-        if name not in self.tools:
-            raise ValueError(f"Tool {name} not registered")
-        return self.tools[name](payload)
+    def register(self, name: str, fn: Callable) -> None:
+        """Register a new tool. Name must be in the whitelist."""
+        if name not in _WHITELIST:
+            raise ValueError(
+                f"Tool '{name}' is not whitelisted. "
+                f"Add it to _WHITELIST in tools/registry.py first."
+            )
+        self._tools[name] = fn
+        log.info("tool registered: %s", name)
+
+    def has(self, name: str) -> bool:
+        return name in self._tools
+
+    def run(self, name: str, payload: str) -> str:
+        """Execute a whitelisted tool with the given payload string."""
+        if name not in self._tools:
+            raise ValueError(f"Tool '{name}' not registered")
+        try:
+            return self._tools[name](payload)
+        except Exception as e:
+            log.error("tool '%s' raised: %s", name, e)
+            return json.dumps({"status": "error", "error": str(e)})
+
+    def list_tools(self) -> list[str]:
+        return sorted(self._tools.keys())

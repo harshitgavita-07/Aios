@@ -100,6 +100,41 @@ def ask_llm_stream(prompt: str) -> Generator[str, None, None]:
         yield f"LLM Error: {e}"
 
 
+
+def stream_with_history(
+    system_prompt: str,
+    history: list[dict],
+    user_input: str,
+) -> Generator[str, None, None]:
+    """
+    Stream a response using full conversation history for context.
+
+    *history* is a list of {role, content} dicts in chronological order.
+    The current user message is appended automatically.
+    """
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(history)
+    messages.append({"role": "user", "content": user_input})
+
+    try:
+        stream = ollama.chat(
+            model=get_model(),
+            messages=messages,
+            stream=True,
+        )
+        for chunk in stream:
+            token = chunk.message.content
+            if token:
+                yield token
+    except ResponseError as e:
+        if e.status_code == 404:
+            yield f"Model '{get_model()}' not found. Run: ollama pull {get_model()}"
+        else:
+            yield f"Ollama error: {e.error}"
+    except Exception as e:
+        yield f"LLM Error: {e}"
+
+
 def list_models() -> list[str]:
     return _list_models()
 
