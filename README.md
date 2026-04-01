@@ -197,7 +197,7 @@ Contributions welcome. Before opening a PR:
 3. New tools must go through the whitelist system
 4. UI changes must not block the main thread
 
-##### See[https://github.com/harshitgavita-07/Aios/edit/main/CONTRIBUTING.md] (CONTRIBUTING.md).
+##### See (CONTRIBUTING.md).
 
 ---
 
