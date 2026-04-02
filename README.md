@@ -16,6 +16,29 @@
 
 ---
 
+## 📚 Documentation
+
+All documentation is available right here on the homepage:
+
+### 🚀 [Quick Start & Setup](https://github.com/harshitgavita-07/Aios#setup--installation)
+Complete installation guide with prerequisites, dependencies, and troubleshooting
+
+### 🛠️ [Contributing Guidelines](https://github.com/harshitgavita-07/Aios#contributing)
+How to contribute to AIOS development
+
+### 🤖 [gstack Integration](https://github.com/harshitgavita-07/Aios#gstack-integration--role-based-agent-workflows)
+Role-based agent workflows (CEO, Engineer, QA, etc.) powered by Ollama
+
+### 📖 [Full Documentation Index](#)
+- [Setup Guide](https://github.com/harshitgavita-07/Aios#setup--installation)
+- [Troubleshooting](https://github.com/harshitgavita-07/Aios#troubleshooting)
+- [Architecture](https://github.com/harshitgavita-07/Aios#architecture)
+- [Tool System](https://github.com/harshitgavita-07/Aios#tool-system)
+- [gstack Skills](https://github.com/harshitgavita-07/Aios#available-skills)
+- [Contributing](https://github.com/harshitgavita-07/Aios#contributing)
+
+---
+
 ## What It Does
 
 AIOS transforms your desktop into an intelligent agent system:
@@ -253,6 +276,36 @@ pip install pyaccelerate
 
 ---
 
+## 🤝 Contributing to AIOS
+
+AIOS is an open-source local AI desktop assistant. Contributions are welcome!
+
+### Key Design Decisions
+- **Ollama SDK** — cleaner, faster, proper error handling
+- **Streaming** — tokens display in real time via QThread + Qt signals
+- **Hardware-aware** — auto-detects VRAM and picks the best model
+- **Non-blocking UI** — all LLM calls run in background threads
+- **Settings panel** — searchable model catalog with download and performance profiles
+
+### Ideas for Contribution
+- 🎤 **Voice I/O** — Add speech-to-text input and TTS output
+- 🔌 **Plugin system** — Allow custom skill modules
+- ⌨️ **Global hotkey** — Summon the assistant from anywhere
+- 💾 **Conversation memory** — Persist chat history across sessions
+- 🎨 **UI themes** — Light mode, custom color schemes
+- 📎 **File/image input** — Drag and drop files for context
+- 📊 **Token usage display** — Show tokens/sec and context window usage
+
+### Development Setup
+```bash
+git clone https://github.com/harshitgavita-07/Aios.git
+cd Aios
+pip install -r requirements.txt
+python app.py
+```
+
+---
+
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
@@ -477,6 +530,43 @@ for task in history:
 
 ---
 
+## 📖 Documentation Index
+
+All AIOS documentation is available right here on the homepage:
+
+### 🚀 Getting Started
+- **[Quick Start](#quick-start)** — Get AIOS running in 5 minutes
+- **[Setup & Installation](#setup--installation)** — Complete installation guide
+- **[Prerequisites](#prerequisites)** — What you need before installing
+- **[Troubleshooting](#troubleshooting)** — Solutions to common issues
+
+### 🏗️ Architecture & Development
+- **[Architecture](#architecture)** — How AIOS works internally
+- **[Project Structure](#project-structure)** — Code organization
+- **[Tool System](#tool-system)** — Available tools and security
+- **[Memory System](#memory)** — Conversation persistence
+- **[SoulSync](#soulsync)** — Emotion detection and adaptation
+
+### 🤖 Advanced Features
+- **[gstack Integration](#gstack-integration--role-based-agent-workflows)** — Role-based agent workflows
+- **[Available Skills](#available-skills)** — CEO, Engineer, QA, and more
+- **[RAG Features](#troubleshooting)** — Web search and vector storage
+- **[Computer Control](#what-aiOS-understands-natively)** — System automation tools
+
+### 📝 Development & Contribution
+- **[Contributing to AIOS](#-contributing-to-aiOS)** — How to contribute
+- **[Development Setup](#development-setup)** — For contributors
+- **[Roadmap](#roadmap)** — Future features and plans
+- **[Requirements](#requirements)** — Dependencies and versions
+
+### 📄 Documentation Files
+- **[README.md](https://github.com/harshitgavita-07/Aios/blob/main/README.md)** — This main documentation
+- **[CONTRIBUTING.md](https://github.com/harshitgavita-07/Aios/blob/main/CONTRIBUTING.md)** — Contribution guidelines
+- **[SETUP.md](https://github.com/harshitgavita-07/Aios/blob/main/SETUP.md)** — Detailed setup instructions
+- **[gstack/README.md](https://github.com/harshitgavita-07/Aios/blob/main/gstack/README.md)** — gstack integration docs
+
+---
+
 ## Contributing
 
 Contributions welcome. Before opening a PR:
@@ -486,12 +576,16 @@ Contributions welcome. Before opening a PR:
 3. New tools must go through the whitelist system
 4. UI changes must not block the main thread
 
+<<<<<<< HEAD
 See [CONTRIBUTING.md](CONTRIBUTING.md).
            └──────┬──────┘
                   │
                   ▼
             Streaming Response
 ```
+=======
+##### See[https://github.com/harshitgavita-07/Aios/edit/main/CONTRIBUTING.md] (CONTRIBUTING.md).
+>>>>>>> b16e19e598d43e6ae966ec65a3a306a0021919a9
 
 ---
 
@@ -612,18 +706,15 @@ See `CONTRIBUTING.md` for guidelines.
 ## License
 
 MIT
->>>>>>> main
 
 ---
 
 <div align="center">
 
-<<<<<<< HEAD
 Built by [Harshit Gavita](https://github.com/harshitgavita-07)
 
-*Your AI. Your machine. Your data.*
+***Your AI. Your machine. Your data.***
 =======
 **Built for the local AI future.**
->>>>>>> main
 
 </div>

@@ -362,6 +362,7 @@ class AgentController:
                 memory_messages=memory_context,
                 rag_results=rag_results,
                 web_results=web_results,
+                tool_results=tool_results,
                 system_prompt=system_prompt
             )
             
@@ -639,6 +640,56 @@ class AgentController:
         """Toggle research mode."""
         # This can be used to force web search
         pass
+
+    def process_stream(self, user_input: str) -> Generator[Dict[str, Any], None, None]:
+        """
+        Process user input and yield streaming updates for UI compatibility.
+        
+        This method wraps the synchronous process() method to provide
+        streaming updates that the UI expects.
+        """
+        try:
+            # Yield thinking steps as they happen
+            yield {"type": "thinking", "message": "Processing your request..."}
+            
+            # Call the main process method
+            result = self.process(user_input, show_thinking=False)
+            
+            # Yield mode detection
+            yield {"type": "mode", "mode": result.get("mode", "chat")}
+            
+            # Yield sources if any
+            sources = result.get("sources", [])
+            if sources:
+                yield {"type": "sources", "data": {"count": len(sources), "sources": sources}}
+            
+            # Yield thinking steps from the result
+            for step in result.get("thinking_steps", []):
+                yield {"type": "thinking", "message": step["message"]}
+            
+            # Yield the response as tokens (simulate streaming)
+            response = result.get("response", "")
+            if response:
+                # Split response into tokens (words) for streaming effect
+                words = response.split()
+                for word in words:
+                    yield {"type": "token", "content": word + " "}
+                    # Small delay to simulate streaming (optional)
+                    import time
+                    time.sleep(0.01)
+            
+            # Yield completion with confidence
+            confidence = result.get("confidence")
+            if confidence:
+                confidence_str = f"{confidence.level.value} ({confidence.overall:.2f})"
+            else:
+                confidence_str = "UNKNOWN"
+            
+            yield {"type": "complete", "confidence": confidence_str}
+            
+        except Exception as e:
+            log.error(f"Error in process_stream: {e}")
+            yield {"type": "error", "message": str(e)}
 
 
 

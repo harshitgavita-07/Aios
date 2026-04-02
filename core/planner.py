@@ -109,6 +109,7 @@ class Planner:
             "calculator": ["calculate", "compute", "math", "sum", "multiply"],
             "file": ["file", "read", "write", "create", "delete"],
             "shell": ["run", "execute", "command", "terminal"],
+            "open_application": ["open", "launch", "start", "run", "application", "browser", "youtube"],
         }
         
         suggested_tools = []
@@ -243,11 +244,74 @@ class Planner:
         tool_name = step.parameters.get("tool")
         tool_input = step.parameters.get("input", "")
         
+        # Parse tool input based on tool type
+        payload = self._parse_tool_payload(tool_name, tool_input)
+        
         try:
-            result = tool_executor.execute(tool_name, tool_input)
+            result = tool_executor.execute(tool_name, payload)
             return {"tool": tool_name, "result": result}
         except Exception as e:
             return {"tool": tool_name, "error": str(e)}
+
+    def _parse_tool_payload(self, tool_name: str, user_input: str) -> Any:
+        """Parse user input into appropriate payload for the tool."""
+        text = user_input.lower()
+        
+        if tool_name == "open_application":
+            # Extract what to open from user input
+            # Look for common targets
+            targets = {
+                "youtube": ["youtube", "yt"],
+                "browser": ["browser", "chrome", "firefox", "edge"],
+                "notepad": ["notepad", "editor", "text"],
+                "calculator": ["calculator", "calc"],
+                "explorer": ["explorer", "file explorer", "files"],
+            }
+            
+            for target, keywords in targets.items():
+                if any(kw in text for kw in keywords):
+                    return {"target": target}
+            
+            # If no specific target found, try to extract from text
+            # Look for URLs or application names
+            import re
+            url_match = re.search(r'(https?://[^\s]+)', user_input)
+            if url_match:
+                return {"target": url_match.group(1)}
+            
+            # Default to trying the whole input as target
+            return {"target": user_input.strip()}
+            
+        elif tool_name == "run_command":
+            # Extract command from user input
+            command = user_input.replace("run command", "").replace("execute", "").strip()
+            return {"command": command}
+            
+        elif tool_name == "take_screenshot":
+            # Optional filename
+            filename = None
+            if "as" in text or "named" in text:
+                # Try to extract filename
+                pass
+            return {"filename": filename}
+            
+        elif tool_name == "file_read":
+            # Extract file path
+            path = user_input.replace("read file", "").replace("open file", "").strip()
+            return {"path": path}
+            
+        elif tool_name == "file_write":
+            # This is more complex - would need content extraction
+            return {"error": "File writing requires specific path and content"}
+            
+        elif tool_name == "calculator":
+            # Extract expression
+            expression = user_input.replace("calculate", "").replace("compute", "").strip()
+            return {"expression": expression}
+            
+        else:
+            # For unknown tools, pass the input as-is
+            return user_input
 
     def _execute_llm(self, step: PlanStep, llm_client, previous_results: Dict) -> str:
         """Execute an LLM synthesis step."""

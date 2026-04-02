@@ -43,6 +43,7 @@ class ContextManager:
         self.source_weights = {
             "system": 1.0,
             "user_current": 0.95,
+            "tool_result": 0.9,
             "memory_recent": 0.8,
             "rag_high": 0.75,
             "web_fresh": 0.7,
@@ -57,6 +58,7 @@ class ContextManager:
                      memory_messages: List[Dict],
                      rag_results: Optional[List[Dict]] = None,
                      web_results: Optional[List[Dict]] = None,
+                     tool_results: Optional[List[Dict]] = None,
                      system_prompt: str = "") -> List[Dict[str, str]]:
         """
         Build optimized context for LLM.
@@ -124,6 +126,24 @@ class ContextManager:
                     relevance_score=0.7,
                     timestamp=result.get("timestamp", ""),
                     token_estimate=self._estimate_tokens(result.get("content", ""))
+                ))
+        
+        # Add tool execution results
+        if tool_results:
+            for result in tool_results:
+                tool_name = result.get("tool", "unknown")
+                tool_output = result.get("result", {})
+                if isinstance(tool_output, dict) and tool_output.get("success"):
+                    content = f"Tool '{tool_name}' executed successfully: {tool_output.get('output', '')}"
+                else:
+                    content = f"Tool '{tool_name}' execution result: {str(tool_output)}"
+                
+                fragments.append(ContextFragment(
+                    content=content,
+                    source="tool_result",
+                    relevance_score=0.9,  # High priority for tool results
+                    timestamp="",
+                    token_estimate=self._estimate_tokens(content)
                 ))
         
         # Sort by weighted relevance
