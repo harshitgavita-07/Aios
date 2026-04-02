@@ -1,37 +1,38 @@
-# AIOS
+# AIOS v3.0 — AI-Native Operating Environment
 
-**A local-first AI runtime with reasoning, memory, and research capabilities.**
+**The next evolution of AIOS: from AI assistant to AI-native operating system.**
 
 ```
-┌─────────────────────────────────────────────┐
-│  Your machine. Your data. Your AI.           │
-│  No cloud. No API keys. No compromises.      │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Your machine. Your agents. Your workflows. Your AI.         │
+│  No cloud. No API keys. No compromises.                      │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Ollama](https://img.shields.io/badge/Ollama-local%20LLM-black?style=flat-square)](https://ollama.ai)
 [![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?style=flat-square)](https://doc.qt.io/qtforpython/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+
+> **AIOS v3.0 transforms your desktop into an AI-native operating environment where agents are applications, workflows are UI, and on-device intelligence is the core paradigm.**
 
 ---
 
 ## What It Does
 
-AIOS transforms your desktop into an intelligent agent system:
+AIOS v3.0 reimagines computing where AI becomes the operating system:
 
-| Capability | What You Can Do |
-|------------|-----------------|
-| **Chat** | Natural conversations with persistent memory |
-| **Research** | "What's the latest news about..." — real-time web search + RAG |
-| **Memory** | SQLite conversation history. Context survives restarts. |
-| **Emotion awareness** | Detects frustration, curiosity, excitement and adapts tone. |
-| **Intent routing** | Distinguishes chat, tool execution, and system commands. |
-| **Tool execution** | Whitelist-only tool registry. Safe by default. |
-| **Streaming UI** | Token-by-token display. UI never blocks. |
-| **Hardware-aware** | Auto-selects the best model for your GPU/CPU. |
-| **Execute** | Run calculations, file operations, system commands |
-| **Reason** | Complex analysis with step-by-step thinking |
+| Paradigm Shift | What You Can Do |
+|----------------|-----------------|
+| **Agents as Applications** | Agents replace traditional desktop apps — spawn, coordinate, and manage them |
+| **Workflows as UI** | Complex tasks orchestrated through natural language workflows |
+| **Intent-Driven Computing** | User intents automatically spawn agents and coordinate workflows |
+| **Context-Aware Environment** | The system adapts to your environment, history, and preferences |
+| **Multi-Agent Collaboration** | Agents communicate and collaborate autonomously via the agent mesh |
+| **Hardware Optimization** | Automatic backend selection (CPU/GPU/Cloud) with GGUF model support |
+| **Real-Time Orchestration** | Live workflow monitoring with step-by-step progress tracking |
+| **Natural Language Commands** | "Create a presentation about AI trends" spawns a workflow automatically |
+| **Persistent Agent State** | Agents maintain context across sessions and system restarts |
+| **On-Device Intelligence** | Everything runs locally — your data never leaves your machine |
 
 ---
 
@@ -41,163 +42,276 @@ AIOS transforms your desktop into an intelligent agent system:
 # Clone and setup
 git clone https://github.com/harshitgavita-07/Aios.git
 cd Aios
-pip install -r requirements.txt
+pip install -r requirements-v3.txt
 
-# Run
-python app.py
+# Launch AI-native workspace (default)
+python app_v3.py
+
+# Or launch legacy chat interface
+python app_v3.py --mode legacy
 ```
 
-A floating bubble appears. Click to open.
+The AI-native workspace appears, where agents are your applications and workflows are your interface.
 
 ---
 
 ## Architecture
 
 ```
-User Input
-     │
-     ▼
- Planner ─────────────────────────────────┐
- (intent: chat | tool | system)           │
-     │                                    │
-     ▼                                    ▼
- SoulSync                         System Handler
- (emotion + tone)                 (clear memory, list models, ...)
-     │
-     ▼
- Memory.history()
- (last N messages)
-     │
-     ▼
- LLM (Ollama — streaming)
-     │
-     ▼
- Memory.save()  ──►  UI token stream
+┌─────────────────────────────────────────────────────────────┐
+│                    AIOS Workspace                           │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │ Agent Widgets │ Workflow Panels │ Intent Interface     │ │
+│  └─────────────────────────────────────────────────────────┘ │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+           ┌──────────▼──────────┐
+           │   AIOS Runtime     │
+           │                    │
+           │  ┌──────────────┐  │
+           │  │ Agent Mesh   │  │
+           │  └──────────────┘  │
+           │                    │
+           │  ┌──────────────┐  │
+           │  │ Workflow     │  │
+           │  │ Engine       │  │
+           │  └──────────────┘  │
+           │                    │
+           │  ┌──────────────┐  │
+           │  │ Intent       │  │
+           │  │ Engine       │  │
+           │  └──────────────┘  │
+           │                    │
+           │  ┌──────────────┐  │
+           │  │ Context      │  │
+           │  │ Engine       │  │
+           │  └──────────────┘  │
+           │                    │
+           │  ┌──────────────┐  │
+           │  │ Resource     │  │
+           │  │ Manager      │  │
+           │  └──────────────┘  │
+           └────────────────────┘
+                      │
+           ┌──────────▼──────────┐
+           │   LLM Backends      │
+           │                     │
+           │  • Ollama           │
+           │  • llama.cpp        │
+           │  • Transformers     │
+           │  • Custom APIs      │
+           └─────────────────────┘
 ```
 
 ---
 
-## Project structure
+## Core Components
+
+### AIOS Runtime Layer
+The foundational operating environment for AI-native computing:
+
+- **Agent Mesh**: Inter-agent communication and collaboration system
+- **Workflow Engine**: Complex task orchestration with dependency management
+- **Intent Engine**: Natural language processing for user intent recognition
+- **Context Engine**: Environment awareness and state management
+- **Resource Manager**: Hardware and software resource allocation
+
+### AI-Native Workspace
+The desktop environment where agents are the primary interface:
+
+- **Agent Widgets**: Visual representations of running agents
+- **Workflow Panels**: Real-time workflow monitoring and control
+- **Intent Interface**: Natural language command input
+- **Context Display**: Environment and system state visualization
+- **System Tray Integration**: Background operation management
+
+### Enhanced LLM Integration
+- **Unified Client**: Seamless switching between Ollama, llama.cpp, and other backends
+- **Hardware Optimization**: Automatic detection and optimization for CUDA, Metal, Vulkan
+- **GGUF Model Support**: Direct support for optimized model formats
+- **Streaming Inference**: Real-time response generation with streaming support
+
+---
+
+## Project Structure
 
 ```
 Aios/
-├── app.py               Entry point
-├── bubble.py            Floating desktop bubble (always-on-top)
-├── ui.py                Chat window (streaming, emotion indicator, clear button)
-├── worker.py            QThread — routes through agent, never blocks UI
-├── llm.py               Ollama SDK wrapper (streaming + history)
-├── hardware.py          GPU/CPU detection + model recommendation
-├── settings.py          Model selector, download catalog, performance profiles
+├── app_v3.py              # Main AIOS v3.0 application (workspace + legacy modes)
+├── app.py                 # Legacy chat interface (backward compatibility)
+├── README-v3.md           # AIOS v3.0 documentation
+├── requirements-v3.txt    # Dependencies for AI-native architecture
 │
-├── core/
-│   ├── agent.py         Orchestrator — memory + soulsync + planner + LLM
-│   ├── memory.py        SQLite conversation store + user profile
-│   ├── soulsync.py      Emotion detection + tone adaptation
-│   └── planner.py       Intent detection (chat / tool / system)
+├── runtime/               # AIOS runtime layer
+│   └── aios_runtime.py    # Core runtime with agent mesh, workflow engine, etc.
 │
-└── tools/
-    ├── registry.py      Whitelist-only tool registry
-    └── think_tool.py    Structured reasoning scratchpad
+├── ui/                    # User interface components
+│   ├── workspace.py       # AI-native workspace manager
+│   ├── chat_ui.py         # Legacy chat interface
+│   └── bubble.py          # Floating desktop bubble
+│
+├── core/                  # Core AIOS components
+│   ├── agent.py           # Orchestrator — memory + soulsync + planner + LLM
+│   ├── memory.py          # SQLite conversation store + user profile
+│   ├── soulsync.py        # Emotion detection + tone adaptation
+│   ├── planner.py         # Intent detection (chat / tool / system)
+│   └── mode_controller.py # Legacy mode management
+│
+├── rag/                   # Retrieval-augmented generation
+│   ├── embedder.py        # Text embedding generation
+│   ├── pipeline.py        # RAG processing pipeline
+│   ├── processor.py       # Document processing
+│   ├── retriever.py       # Context retrieval
+│   └── vector_store.py    # Vector storage and search
+│
+├── tools/                 # Tool and skill system
+│   ├── registry.py        # Whitelist-only tool registry
+│   ├── executor.py        # Tool execution engine
+│   ├── system_tools.py    # Built-in system tools
+│   └── think_tool.py      # Structured reasoning scratchpad
+│
+├── llm_*.py              # LLM backend implementations
+│   ├── llm.py            # Ollama SDK wrapper
+│   ├── llm_llamacpp.py   # Direct llama.cpp backend
+│   └── llm_unified.py    # Unified client for multiple backends
+│
+└── hardware.py           # Hardware detection and optimization
 ```
 
 ---
 
-## Quick start
+## What AIOS v3.0 Understands
 
-```bash
-# Prerequisites: Python 3.10+, Ollama running, at least one model pulled
-ollama pull llama3.2
-
-git clone https://github.com/harshitgavita-07/Aios.git
-cd Aios
-pip install -r requirements.txt
-python app.py
-```
-
-A floating bubble appears on your desktop. Click it to open the assistant.
-
----
-
-## What Aios understands natively
-
-| Input | What happens |
-|-------|-------------|
-| Any question | Routes to LLM with conversation history as context |
-| `clear chat` / `new chat` | Wipes memory, starts fresh session |
-| `list models` | Shows installed Ollama models |
-| `show hardware` | Displays GPU/VRAM/CPU info |
-| `think about X` | Runs structured reasoning step via ThinkTool |
-| Frustration keywords | Switches to calm, direct tone |
-| Curiosity keywords | Switches to thorough, explanatory tone |
+| Input Type | What Happens |
+|------------|-------------|
+| **Natural Language Tasks** | "Create a presentation about AI trends" → spawns workflow with research, writing, and formatting agents |
+| **Complex Workflows** | "Analyze my codebase and suggest improvements" → coordinates code analysis, testing, and documentation agents |
+| **Multi-Step Processes** | "Plan my week and set up reminders" → creates planning agent, calendar integration, and notification system |
+| **Agent Management** | "Show me running agents" → displays agent mesh status and resource usage |
+| **Workflow Monitoring** | "What's the status of my research project?" → shows workflow progress with step-by-step details |
+| **Context Queries** | "What was I working on yesterday?" → retrieves from persistent context engine |
+| **Resource Requests** | "I need more GPU memory for this task" → resource manager reallocates hardware |
+| **System Commands** | "Clear all workflows" or "Restart agent mesh" → direct runtime control |
 
 ---
 
-## Memory
+## Agent Mesh
 
-Conversations are stored in `~/.aios/memory.db` (SQLite).
+Agents communicate and collaborate autonomously:
 
-- The last 20 messages are included in every LLM request as context
-- Emotion tags are stored per message for future analytics
-- User preferences persist in a `profile` table
-- `clear chat` wipes the current session and starts a new one
-
----
-
-## SoulSync
-
-Rule-based, zero-latency emotion detection (no ML model, no extra dependencies).
-
-Detects: `neutral` `curious` `frustrated` `anxious` `happy` `excited`
-
-Each emotion maps to a different system prompt tone. The mood is visible in the bottom-left of the chat window as a color-coded indicator.
+- **Inter-Agent Communication**: Async message passing between agents
+- **Dynamic Agent Creation**: New agents spawn based on user needs
+- **Agent Persistence**: Agents maintain state across sessions
+- **Resource Sharing**: Agents coordinate hardware and data access
+- **Failure Recovery**: Automatic agent restart and workflow rerouting
 
 ---
 
-## Tool system
+## Workflow Engine
 
-Tools are whitelisted explicitly in `tools/registry.py`. Nothing runs unless it is on the whitelist. Currently registered:
+Complex task orchestration with intelligent dependency management:
 
-- `think_tool` — structured reasoning scratchpad
+- **Natural Language Parsing**: Convert requests into executable workflows
+- **Dependency Resolution**: Automatic task sequencing and parallelization
+- **Progress Tracking**: Real-time workflow monitoring and status updates
+- **Error Handling**: Intelligent retry and escalation strategies
+- **Template System**: Reusable workflow patterns for common tasks
 
-To add a tool: implement a `run(payload: str) -> str` function, add the name to `_WHITELIST`, and register it in `ToolRegistry._register_defaults()`.
+---
+
+## Memory & Context
+
+Enhanced persistence and context awareness:
+
+- **SQLite Storage**: Conversation history and agent states
+- **Context Engine**: Environment awareness and preference learning
+- **Cross-Session Continuity**: Agents remember user patterns and preferences
+- **Emotion Integration**: SoulSync emotion detection for adaptive responses
+- **Profile Management**: User preferences and behavior patterns
+
+---
+
+## Hardware Optimization
+
+Intelligent backend selection and resource management:
+
+- **Multi-Backend LLM**: Automatic selection (CPU/GPU/Cloud)
+- **GGUF Model Support**: Optimized model formats for faster inference
+- **Hardware Detection**: Real-time detection of CUDA, Metal, Vulkan, etc.
+- **Resource Allocation**: Dynamic hardware assignment based on task requirements
+- **Performance Monitoring**: Real-time resource usage and optimization suggestions
 
 ---
 
 ## Requirements
 
+**Core Dependencies:**
 ```
-PySide6>=6.7.0
-ollama>=0.4.0
+Python>=3.10
+PySide6>=6.5.0
+asyncio-mqtt>=0.13.0
+numpy>=1.24.0
+faiss-cpu>=1.7.0
 ```
 
-Optional (richer GPU profiling):
+**LLM Backends:**
 ```
-pip install pyaccelerate
+llama-cpp-python>=0.2.0
+ollama>=0.2.0
+httpx>=0.25.0
+```
+
+**Optional (GPU acceleration):**
+```
+torch>=2.0.0
+pyaccelerate>=0.20.0
 ```
 
 ---
 
 ## Roadmap
 
-- [ ] Voice input (Whisper via Ollama)
-- [ ] Per-session system prompt customisation
-- [ ] File context — drag a file into chat
-- [ ] Plugin API for third-party tools
-- [ ] Persistent user profile from conversation patterns
-- [ ] Hotkey to summon from anywhere
+- [ ] Voice input and output integration
+- [ ] Advanced agent marketplace and sharing
+- [ ] Workflow template marketplace
+- [ ] Multi-device agent synchronization
+- [ ] Advanced intent recognition with ML
+- [ ] Plugin API for third-party agents
+- [ ] Persistent user profile learning
+- [ ] Hotkey and gesture integration
+- [ ] Advanced workflow visualization
+- [ ] Agent performance analytics
 
 ---
 
 ## Contributing
 
-Contributions welcome. Before opening a PR:
+Contributions welcome! The AI-native OS paradigm opens many exciting possibilities:
 
-1. Keep changes focused — one concern per PR
-2. No new heavy dependencies
-3. New tools must go through the whitelist system
-4. UI changes must not block the main thread
+1. **Agent Development**: Create specialized agents for specific domains
+2. **Workflow Templates**: Design reusable workflow patterns
+3. **UI Components**: Build new workspace widgets and interfaces
+4. **Backend Integration**: Add support for new LLM providers
+5. **Hardware Optimization**: Improve resource management and detection
 
-##### See (CONTRIBUTING.md).
+**Guidelines:**
+- Keep changes focused — one concern per PR
+- New agents must integrate with the agent mesh
+- UI changes must not block the main thread
+- Hardware optimizations should benefit all users
+- Documentation updates required for new features
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+**AIOS v3.0** — Where AI becomes the operating system, and agents are your applications. 🤖✨
 
 ---
 
