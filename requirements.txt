@@ -6,6 +6,11 @@ PySide6>=6.7.0
 # LLM Integration
 ollama>=0.4.0
 
+# Optional: llama.cpp for direct C++ inference (faster, more control)
+# pip install llama-cpp-python
+# For CUDA support: pip install llama-cpp-python[cuBLAS]
+# For Metal support (macOS): pip install llama-cpp-python[metal]
+
 # System Information
 psutil>=5.9.0
 
