@@ -1,0 +1,60 @@
+# AIOS v3.0 Requirements
+# AI-Native Operating Environment
+
+# Core Python
+python>=3.10
+
+# Qt UI Framework
+PySide6>=6.5.0
+PySide6-QtAds>=4.2.0
+
+# LLM Backends
+llama-cpp-python>=0.2.0
+ollama>=0.2.0
+
+# Async and concurrency
+asyncio-mqtt>=0.13.0
+aiofiles>=23.0.0
+
+# Data processing
+numpy>=1.24.0
+pandas>=2.0.0
+faiss-cpu>=1.7.0
+
+# HTTP and networking
+httpx>=0.25.0
+aiohttp>=3.8.0
+
+# Configuration and serialization
+pyyaml>=6.0
+toml>=0.10.0
+orjson>=3.9.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+mypy>=1.5.0
+flake8>=6.0.0
+black>=23.0.0
+
+# Optional: GPU acceleration (uncomment if needed)
+# torch>=2.0.0
+# torchvision>=0.15.0
+# torchaudio>=2.0.0
+
+# Optional: Additional LLM backends
+# transformers>=4.30.0
+# accelerate>=0.20.0
+
+# Optional: Web search capabilities
+# duckduckgo-search>=4.0.0
+# googlesearch-python>=1.2.0
+
+# Optional: Voice and audio
+# pyttsx3>=2.90
+# speechrecognition>=3.10.0
+
+# Optional: System integration
+# psutil>=5.9.0
+# pywin32>=306; sys_platform == "win32"
+# pyobjc>=9.0; sys_platform == "darwin"
