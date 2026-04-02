@@ -5,6 +5,7 @@ Detects GPU VRAM, CPU cores, total RAM and recommends the best
 Ollama model from the locally available models.
 
 Optional: uses pyaccelerate (v0.9+) for richer hardware profiling.
+Also supports llama.cpp backend detection for direct C++ inference.
 """
 
 import logging
@@ -38,6 +39,9 @@ def detect() -> dict:
         "pcie_gen": 0,
         "driver_version": "",
         "features": [],
+        # llama.cpp backend detection
+        "llamacpp_backends": _detect_llamacpp_backends(),
+        "recommended_llamacpp_backend": "",
     }
 
     # Try pyaccelerate first (richer data)
@@ -75,6 +79,9 @@ def detect() -> dict:
         info["vram_gb"] = vram
         info["backend"] = "cuda"
 
+    # Set recommended llama.cpp backend
+    info["recommended_llamacpp_backend"] = _get_recommended_llamacpp_backend(info)
+
     return info
 
 
@@ -90,7 +97,18 @@ _MODEL_TIERS: list[tuple[float, list[str]]] = [
     (999.0, ["llama3.1:70b", "qwen2.5:72b", "deepseek-r1:70b", "llama3.1:8b"]),
 ]
 
+# GGUF model tiers for llama.cpp (model_size_gb, preferred_gguf_models)
+_GGUF_MODEL_TIERS: list[tuple[float, list[str]]] = [
+    (2.0, ["gemma-3-1b-it", "phi-3-mini-4k-instruct", "qwen2.5-1.5b-instruct"]),
+    (4.0, ["gemma-3-4b-it", "phi-3-medium-4k-instruct", "qwen2.5-3b-instruct"]),
+    (8.0, ["llama-3.2-3b-instruct", "mistral-7b-instruct-v0.1", "qwen2.5-7b-instruct"]),
+    (12.0, ["llama-3.1-8b-instruct", "gemma-3-12b-it", "qwen2.5-14b-instruct"]),
+    (24.0, ["qwen2.5-32b-instruct", "llama-3.1-8b-instruct"]),
+    (999.0, ["qwen2.5-72b-instruct", "llama-3.1-70b-instruct"]),
+]
+
 _FALLBACK_MODEL = "llama3.2:1b"
+_FALLBACK_GGUF_MODEL = "gemma-3-1b-it"
 
 
 def recommend_model(hw: dict, available_models: list[str]) -> str:
@@ -111,6 +129,85 @@ def recommend_model(hw: dict, available_models: list[str]) -> str:
 
     # Nothing matched the tier — return the smallest available model
     return available_models[0] if available_models else _FALLBACK_MODEL
+
+
+def recommend_gguf_model(hw: dict, available_models: list[str], backend: str = "cpu") -> str:
+    """
+    Pick the best GGUF model from *available_models* for the detected hardware and backend.
+
+    Args:
+        hw: Hardware info dict from detect()
+        available_models: List of available GGUF model names
+        backend: llama.cpp backend ('cuda', 'cpu', etc.)
+
+    Returns:
+        Recommended model name
+    """
+    if not available_models:
+        return _FALLBACK_GGUF_MODEL
+
+    # Adjust memory budget based on backend
+    vram = hw.get("vram_gb", 0.0)
+    ram = hw.get("ram_gb", 8.0)
+
+    if backend == "cuda" and vram > 0:
+        # For CUDA, we can use VRAM for model layers
+        budget = vram
+    elif backend in ["metal", "vulkan", "sycl", "hip"]:
+        # For other GPU backends, use combination of VRAM and RAM
+        budget = min(vram + ram * 0.5, ram) if vram > 0 else ram * 0.5
+    else:
+        # CPU-only: use RAM with conservative estimate
+        budget = ram * 0.3  # Conservative: use 30% of RAM for model
+
+    # Ensure minimum budget
+    budget = max(budget, 2.0)
+
+    for max_memory, preferred in _GGUF_MODEL_TIERS:
+        if budget >= max_memory:
+            for model_name in preferred:
+                if model_name in available_models:
+                    return model_name
+            break
+
+    # Nothing matched the tier — return the smallest available model
+    return available_models[0] if available_models else _FALLBACK_GGUF_MODEL
+
+
+def get_llamacpp_config(hw: dict, backend: str) -> dict:
+    """
+    Get recommended llama.cpp configuration based on hardware and backend.
+
+    Args:
+        hw: Hardware info dict from detect()
+        backend: llama.cpp backend
+
+    Returns:
+        Configuration dict with n_threads, n_gpu_layers, etc.
+    """
+    config = {
+        "n_ctx": 4096,
+        "n_threads": hw.get("cpu_cores", 4),
+        "n_gpu_layers": -1,  # Auto-detect
+        "backend": backend,
+    }
+
+    if backend == "cuda":
+        # CUDA-specific optimizations
+        vram_gb = hw.get("vram_gb", 0.0)
+        if vram_gb >= 8:
+            config["n_gpu_layers"] = -1  # All layers on GPU
+        elif vram_gb >= 4:
+            config["n_gpu_layers"] = 20  # Partial offloading
+        else:
+            config["n_gpu_layers"] = 10  # Minimal offloading
+
+    elif backend == "cpu":
+        # CPU optimizations
+        cpu_cores = hw.get("cpu_cores", 4)
+        config["n_threads"] = max(1, cpu_cores // 2)  # Use half cores for better responsiveness
+
+    return config
 
 
 # ── Private helpers ───────────────────────────────────────────────────────
@@ -155,3 +252,129 @@ def _nvidia_smi() -> tuple[str, float]:
         return name.strip(), round(float(mem_mb.strip()) / 1024, 1)
     except Exception:
         return "", 0.0
+
+
+# ── llama.cpp Backend Detection ───────────────────────────────────────────
+
+def _detect_llamacpp_backends() -> list[str]:
+    """Detect available llama.cpp backends for the current hardware."""
+    backends = []
+
+    # Check CUDA (NVIDIA GPUs)
+    if _check_cuda_available():
+        backends.append("cuda")
+
+    # Check Metal (Apple Silicon)
+    if _check_metal_available():
+        backends.append("metal")
+
+    # Check Vulkan (cross-platform GPU compute)
+    if _check_vulkan_available():
+        backends.append("vulkan")
+
+    # Check SYCL (Intel GPUs)
+    if _check_sycl_available():
+        backends.append("sycl")
+
+    # Check HIP (AMD GPUs)
+    if _check_hip_available():
+        backends.append("hip")
+
+    # CPU is always available as fallback
+    backends.append("cpu")
+
+    return backends
+
+
+def _get_recommended_llamacpp_backend(hw_info: dict) -> str:
+    """Get the recommended llama.cpp backend based on hardware."""
+    backends = hw_info.get("llamacpp_backends", [])
+
+    # Priority order: cuda > metal > vulkan > sycl > hip > cpu
+    priority_backends = ["cuda", "metal", "vulkan", "sycl", "hip", "cpu"]
+
+    for backend in priority_backends:
+        if backend in backends:
+            return backend
+
+    return "cpu"
+
+
+def _check_cuda_available() -> bool:
+    """Check if CUDA is available."""
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except ImportError:
+        pass
+
+    # Check via nvidia-smi
+    try:
+        subprocess.check_output(["nvidia-smi"], timeout=5)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def _check_metal_available() -> bool:
+    """Check if Metal is available (macOS with Apple Silicon)."""
+    try:
+        # Check if we're on Apple Silicon
+        machine = platform.machine().lower()
+        return machine in ["arm64", "aarch64"] and platform.system() == "Darwin"
+    except:
+        return False
+
+
+def _check_vulkan_available() -> bool:
+    """Check if Vulkan is available."""
+    try:
+        if platform.system() == "Windows":
+            # Check for vulkan-1.dll
+            import ctypes
+            return ctypes.windll.kernel32.LoadLibraryW("vulkan-1.dll") is not None
+        elif platform.system() == "Linux":
+            # Check for libvulkan.so
+            import ctypes
+            try:
+                return ctypes.cdll.LoadLibrary("libvulkan.so.1") is not None
+            except:
+                return False
+        return False
+    except:
+        return False
+
+
+def _check_sycl_available() -> bool:
+    """Check if SYCL is available (Intel GPUs)."""
+    try:
+        # Check for Intel integrated graphics
+        if platform.system() == "Windows":
+            result = subprocess.run(["wmic", "path", "win32_videocontroller", "get", "name"],
+                                  capture_output=True, text=True, timeout=5)
+            output = result.stdout.lower()
+            return "intel" in output and ("uhd" in output or "iris" in output or "hd graphics" in output)
+        elif platform.system() == "Linux":
+            result = subprocess.run(["lspci"], capture_output=True, text=True, timeout=5)
+            output = result.stdout.lower()
+            return "intel" in output and "graphics" in output
+        return False
+    except:
+        return False
+
+
+def _check_hip_available() -> bool:
+    """Check if HIP is available (AMD GPUs)."""
+    try:
+        if platform.system() == "Windows":
+            result = subprocess.run(["wmic", "path", "win32_videocontroller", "get", "name"],
+                                  capture_output=True, text=True, timeout=5)
+            output = result.stdout.lower()
+            return "amd" in output or "radeon" in output
+        elif platform.system() == "Linux":
+            result = subprocess.run(["lspci"], capture_output=True, text=True, timeout=5)
+            output = result.stdout.lower()
+            return "amd" in output and ("radeon" in output or "navi" in output)
+        return False
+    except:
+        return False
