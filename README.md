@@ -1,174 +1,159 @@
 <div align="center">
 
-# 🤖 Aios — Local AI Desktop Assistant
+# Aios
 
-### On-device intelligence. No cloud. No API keys. No data leaving your machine.
+**The AI-native desktop runtime.**
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Ollama](https://img.shields.io/badge/Powered%20by-Ollama-black?style=for-the-badge)](https://ollama.ai)
-[![PySide6](https://img.shields.io/badge/UI-PySide6%20(Qt)-41CD52?style=for-the-badge)](https://doc.qt.io/qtforpython/)
-[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen?style=for-the-badge)]()
+*Not an app that runs AI. The workspace where agents are the interface.*
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![Ollama](https://img.shields.io/badge/Ollama-local%20LLM-black?style=flat-square)](https://ollama.ai)
+[![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?style=flat-square)](https://doc.qt.io/qtforpython/)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+[![Vision](https://img.shields.io/badge/Read-VISION.md-orange?style=flat-square)](VISION.md)
 
 </div>
 
 ---
 
-## 🔒 Why Aios?
+**Every AI desktop tool in 2026 makes the same mistake: it treats AI as an application that runs on top of an OS designed for humans to click things.**
 
-Every AI assistant today sends your data to the cloud — your questions, your context, your private information. **Aios doesn't.**
+Aios is different. It is the workspace itself — a local AI runtime layer where agents, memory, and on-device intelligence are the primitive building blocks, not features bolted onto a chat window.
 
-It runs a full LLM inference engine locally via [Ollama](https://ollama.ai), sits as a floating bubble on your desktop, and responds to natural language queries entirely on your machine.
-
-> Built before "local AI" was a buzzword.
+[**Read the full vision →**](VISION.md)
 
 ---
 
-## ✨ Features
-
-| Feature | Description |
-|---------|-------------|
-| 🔒 **100% Offline** | All inference runs locally via Ollama — zero network requests |
-| 🫧 **Floating Bubble UI** | Always-on-top draggable bubble for instant access |
-| 💬 **Streaming Chat** | Real-time token-by-token display with typing indicator |
-| 🖥️ **Hardware-Aware** | Auto-detects GPU/VRAM and picks the best model for your machine |
-| ⚡ **Non-blocking UI** | LLM runs in a background thread — the interface never freezes |
-| ⚙️ **Settings Panel** | Switch models, download new ones, tune performance — all from the UI |
-| 🧠 **Pluggable Brain** | Modular agent/router architecture — swap LLMs or add skills |
-| 🔧 **Autotune** | Optional Ollama autotune and pyaccelerate integration for speed profiles |
-
----
-
-## 🏗️ Architecture
+## What it does today
 
 ```
-User Input
-    │
-    ▼
-bubble.py ──► ui.py (Chat UI + Streaming + Typing Indicator)
-                │               ▲
-                │               │ token_received / generation_finished
-                ▼               │
-           worker.py (QThread) ─┘
-                │
-                ▼
-           brain.py (Logic)
-                │
-                ▼
-           llm.py (Ollama SDK — chat + streaming)
-                │
-                ▼
-         hardware.py (GPU/CPU detection + model recommendation)
-                │
-                ▼
-         Local LLM via Ollama
-         (runs on your GPU/CPU)
-
-  ┌─────────────────────────────┐
-  │  settings.py (⚙ Settings)  │
-  │  • Auto/Manual model select │
-  │  • Model catalog & download │
-  │  • Performance profiles     │
-  │  • pyaccelerate install     │
-  └─────────────────────────────┘
+User Input → Agent Controller → SoulSync → Memory → Ollama → Streaming Response
 ```
 
-**Files:**
-
-| File | Purpose |
-|------|---------|
-| `app.py` | Entry point — launches QApplication, Bubble, and DesktopAssistant |
-| `bubble.py` | Floating always-on-top draggable bubble widget |
-| `ui.py` | Main chat window with streaming display, typing animation, and settings |
-| `worker.py` | QThread wrapper — runs LLM inference without blocking the UI |
-| `brain.py` | Input processing → LLM orchestration |
-| `agent.py` | Router layer — future plugins (web search, calendar) plug in here |
-| `llm.py` | Ollama SDK wrapper — `ollama.chat()` with streaming and model management |
-| `hardware.py` | GPU/VRAM/CPU/RAM detection with model recommendation tiers |
-| `settings.py` | Settings panel — model selector, download catalog, performance profiles |
+- **Agent pipeline** — intent routing, emotion detection, memory-aware context, tool execution
+- **Persistent memory** — SQLite at `~/.aios/memory.db`, survives sessions
+- **SoulSync** — detects frustration, curiosity, anxiety, excitement and adapts tone in real time
+- **gstack workflows** — `/plan`, `/review`, `/ship`, `/investigate` as local Ollama-powered roles
+- **Hardware-aware** — detects GPU/VRAM, picks the best Ollama model automatically
+- **Streaming UI** — token-by-token display, never blocks, emotion color indicator
+- **No cloud** — 100% local, no API keys, no telemetry
 
 ---
 
-## 🚀 Quick Start
-
-### Prerequisites
-- Python 3.10+
-- [Ollama](https://ollama.ai) installed and running
-- Any Ollama model pulled (e.g. `ollama pull llama3.2`)
-
-### Install & Run
+## Quick start
 
 ```bash
+# Prerequisites: Python 3.10+, Ollama running, one model pulled
+ollama pull llama3.2
+
 git clone https://github.com/harshitgavita-07/Aios.git
 cd Aios
 pip install -r requirements.txt
 python app.py
 ```
 
-A floating bubble will appear on your desktop. Click it to open the assistant.
+A floating bubble appears on your desktop. Click to open the agent workspace.
 
-### Optional: Enhanced Hardware Profiling
+---
 
-```bash
-pip install pyaccelerate
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AIOS RUNTIME                             │
+│                                                             │
+│  bubble.py ──► ui.py (streaming chat, emotion indicator)   │
+│                  │                                          │
+│              worker.py (QThread)                            │
+│                  │                                          │
+│           core/agent.py (orchestrator)                      │
+│           ├── core/planner.py   (intent routing)            │
+│           ├── core/soulsync.py  (emotion + tone)            │
+│           ├── core/memory.py    (SQLite persistence)        │
+│           └── gstack/           (role-based workflows)      │
+│                  │                                          │
+│              llm.py → Ollama (local inference)              │
+│              hardware.py → GPU/VRAM detection               │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-When installed, Aios uses pyaccelerate for richer GPU detection — architecture, CUDA cores, memory type, bandwidth, PCIe info, NVENC/NVDEC, and more.
+---
+
+## Agent commands (built-in)
+
+| Say this | What happens |
+|----------|-------------|
+| Any question | Routes to LLM with full conversation history as context |
+| `clear chat` | Wipes memory, starts fresh session |
+| `list models` | Shows installed Ollama models |
+| `show hardware` | GPU / VRAM / CPU info |
+| `help` | Available commands |
+| `/plan-ceo-review <task>` | gstack CEO role: rethinks the problem |
+| `/review <task>` | gstack Staff Engineer: finds production bugs |
+| `/ship <task>` | gstack Release Engineer: pre-ship checklist |
+| `/investigate <bug>` | gstack Debugger: root-cause analysis |
 
 ---
 
-## 🖥️ Hardware-Aware Model Selection
+## Roadmap
 
-Aios automatically detects your hardware at startup and picks the best model from what you have installed:
+We are building toward an AI-native desktop in four phases.
 
-| VRAM Budget | Recommended Models |
-|-------------|-------------------|
-| ≤ 4 GB | `llama3.2:1b`, `phi3:mini`, `gemma2:2b` |
-| ≤ 6 GB | `llama3.2:3b`, `phi3:3.8b`, `qwen2.5:3b` |
-| ≤ 10 GB | `llama3.1:8b`, `gemma3:12b`, `mistral:7b` |
-| ≤ 16 GB | `llama3.1:8b`, `qwen2.5:14b`, `deepseek-r1:14b` |
-| ≤ 24 GB | `qwen2.5:32b`, `deepseek-r1:32b` |
-| 24+ GB | `llama3.1:70b`, `qwen2.5:72b` |
+| Phase | Status | What it is |
+|-------|--------|-----------|
+| 1 — Local AI Runtime | ✅ Shipped | Agent pipeline, memory, SoulSync, gstack |
+| 2 — Multi-Agent Workspace | 🔧 Building | Multiple agents, tiling layout, task queue |
+| 3 — OS Integration | 📐 Designed | COSMIC applet, systemd service, D-Bus IPC |
+| 4 — AI-Native Primitives | 🔬 Research | Agent-as-process, memory-as-filesystem |
 
-No GPU? Aios falls back to CPU-only mode with a small model.
+[**Full roadmap →**](ROADMAP.md)
 
 ---
 
-## ⚙️ Settings Panel
+## Adjacent ecosystem
 
-Click the ⚙ gear icon in the chat window to access:
+Aios is designed to integrate with, not replace:
 
-- **Model Mode** — Auto (hardware-detected) or Manual selection
-- **Download Models** — Searchable catalog of 18+ popular models with installed/available icons
-- **Performance Profiles** — speed, balanced, memory, multiuser (via Ollama autotune API)
-- **pyaccelerate Install** — One-click install with approval dialog
-
----
-
-## 🔮 Why This Matters
-
-2025–2026 is the era of **on-device AI**:
-- Apple Intelligence runs on-device
-- Meta's LLaMA models run on consumer hardware
-- Privacy regulations are getting stricter globally
-
-Aios was built with this philosophy from day one: **your AI, your machine, your data.**
+- **[Ollama](https://github.com/ollama/ollama)** — local LLM inference backbone
+- **[COSMIC Desktop](https://github.com/pop-os/cosmic-epoch)** — Rust/Wayland compositor for Phase 3
+- **[OpenClaw](https://github.com/openclaw/openclaw)** — skills ecosystem (OpenClaw skills as Aios tools)
+- **[LocalAI](https://github.com/mudler/LocalAI)** — alternative local inference backend
 
 ---
 
-## 🛣️ Roadmap
+## Contributing
 
-- [ ] Voice input / TTS output
-- [ ] System prompt customization via UI
-- [ ] Plugin system for custom skills (web search, calendar, etc.)
-- [ ] Hotkey to summon the assistant from anywhere
-- [ ] Memory / conversation history persistence
+Aios is early. The roadmap is ambitious. Contributions are welcome at every level.
+
+**Good first issues:**
+- Make the chat window resizable (PySide6)
+- Add `aios memory export` CLI command
+- Add `--no-bubble` launch flag
+- Write systemd user service template
+- Port emotion lexicon to configurable YAML
+
+[**Contributing guide →**](CONTRIBUTING.md) | [**Open roadmap issues →**](https://github.com/harshitgavita-07/Aios/issues)
+
+---
+
+## Requirements
+
+```
+PySide6>=6.7.0
+ollama>=0.4.0
+```
+
+Optional:
+```bash
+pip install pyaccelerate  # richer GPU detection
+```
 
 ---
 
 <div align="center">
 
-**Star ⭐ if you believe AI should stay on your machine.**
+Built by [Harshit Gavita](https://github.com/harshitgavita-07) · Pimpri-Chinchwad, India
 
-*Built by [Harshit Gavita](https://github.com/harshitgavita-07)*
+*MIT License · Local · Private · Yours*
 
 </div>
