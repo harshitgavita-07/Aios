@@ -21,7 +21,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal, QThread
 from PySide6.QtGui import QFont, QColor, QPalette, QIcon, QAction
 
-from runtime.aios_runtime import AIOSRuntime, Agent, Workflow, Intent
+from runtime.aios_runtime import (
+    AIOSRuntime, Agent, Workflow, Intent,
+    AgentState, WorkflowState,
+)
 
 log = logging.getLogger("aios.workspace")
 
@@ -153,18 +156,18 @@ class WorkflowWidget(QFrame):
         if self.workflow.steps:
             progress = int((self.workflow.current_step / len(self.workflow.steps)) * 100)
         else:
-            progress = 100 if self.workflow.state == "completed" else 0
+            progress = 100 if self.workflow.state == WorkflowState.COMPLETED else 0
         self.progress_bar.setValue(progress)
 
     def _update_styling(self):
         """Update visual styling based on workflow state."""
-        if self.workflow.state == "running":
+        if self.workflow.state == WorkflowState.RUNNING:
             self.setStyleSheet("background-color: #e3f2fd; border: 2px solid #2196f3;")
-        elif self.workflow.state == "completed":
+        elif self.workflow.state == WorkflowState.COMPLETED:
             self.setStyleSheet("background-color: #e8f5e8; border: 2px solid #4caf50;")
-        elif self.workflow.state == "failed":
+        elif self.workflow.state == WorkflowState.FAILED:
             self.setStyleSheet("background-color: #ffebee; border: 2px solid #f44336;")
-        elif self.workflow.state == "paused":
+        elif self.workflow.state == WorkflowState.PAUSED:
             self.setStyleSheet("background-color: #fff3e0; border: 2px solid #ff9800;")
         else:
             self.setStyleSheet("background-color: #f5f5f5; border: 2px solid #9e9e9e;")
