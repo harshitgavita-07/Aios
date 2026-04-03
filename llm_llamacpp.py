@@ -559,5 +559,4 @@ class LlamaCppClient:
 
     def get_current_model(self) -> Optional[str]:
         """Get current model path."""
-        return self._current_model</content>
-<parameter name="filePath">c:\Users\HARSHIT\Aios\llm_llamacpp.py
+        return self._current_model

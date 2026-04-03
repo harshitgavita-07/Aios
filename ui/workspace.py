@@ -80,13 +80,13 @@ class AgentWidget(QFrame):
 
     def _update_styling(self):
         """Update visual styling based on agent state."""
-        if self.agent.state == "ready":
+        if self.agent.state.value == "ready":
             self.setStyleSheet("background-color: #e8f5e8; border: 2px solid #4caf50;")
-        elif self.agent.state == "active":
+        elif self.agent.state.value == "active":
             self.setStyleSheet("background-color: #fff3e0; border: 2px solid #ff9800;")
-        elif self.agent.state == "busy":
+        elif self.agent.state.value == "busy":
             self.setStyleSheet("background-color: #fff8e1; border: 2px solid #ffc107;")
-        elif self.agent.state == "error":
+        elif self.agent.state.value == "error":
             self.setStyleSheet("background-color: #ffebee; border: 2px solid #f44336;")
         else:
             self.setStyleSheet("background-color: #f5f5f5; border: 2px solid #9e9e9e;")

@@ -11,7 +11,7 @@ from typing import Dict, Any
 LLM_CONFIG = {
     "default_backend": "auto",  # 'auto', 'ollama', or 'llamacpp'
     "ollama": {
-        "host": "http://localhost:8080",
+        "host": "http://localhost:11434",
         "timeout": 30,
         "retries": 3,
     },
@@ -140,5 +140,4 @@ def get_performance_config() -> Dict[str, Any]:
 
 def is_feature_enabled(feature: str) -> bool:
     """Check if a feature is enabled."""
-    return FEATURE_FLAGS.get(feature, False)</content>
-<parameter name="filePath">c:\Users\HARSHIT\Aios\llm_config.py
+    return FEATURE_FLAGS.get(feature, False)

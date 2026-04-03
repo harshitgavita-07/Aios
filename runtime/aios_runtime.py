@@ -211,8 +211,8 @@ class AgentMesh:
         if to_agent and to_agent in self.agents:
             agent = self.agents[to_agent]
             if agent.controller:
-                # Forward to agent controller
-                await agent.controller.handle_message(message)
+                # Log the message (handle_message dispatching happens via process_stream)
+                log.debug(f"Message routed to agent {to_agent}: {message.get('type', 'unknown')}")
 
         # Notify event listeners
         event_type = message.get("type", "message")
@@ -251,8 +251,8 @@ class WorkflowEngine:
         workflow_id = str(uuid.uuid4())
 
         # Generate execution plan
-        plan = self.planner.plan(user_request)
-        steps = self.planner.generate_steps(plan)
+        intent = self.planner.detect_intent(user_request)
+        steps = self.planner.create_plan(user_request, intent) or []
 
         workflow = Workflow(
             workflow_id=workflow_id,
@@ -712,7 +712,7 @@ class AIOSRuntime:
             },
             "workflows": {
                 wf_id: self.workflow_engine.get_workflow_status(wf_id)
-                for wf_id in self.workflows.keys()
+                for wf_id in self.workflow_engine.workflows.keys()
             },
             "resources": self.resource_manager.get_resource_usage(),
             "context": {
@@ -742,9 +742,9 @@ async def init_runtime():
     return runtime
 
 
-def shutdown_runtime():
+async def shutdown_runtime():
     """Shutdown the AIOS runtime."""
     global _runtime_instance
     if _runtime_instance:
-        asyncio.create_task(_runtime_instance.stop())
+        await _runtime_instance.stop()
         _runtime_instance = None

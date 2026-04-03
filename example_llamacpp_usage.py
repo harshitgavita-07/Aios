@@ -167,5 +167,4 @@ def main():
     print("For more information, see LLAMACPP_INTEGRATION.md")
 
 if __name__ == "__main__":
-    main()</content>
-<parameter name="filePath">c:\Users\HARSHIT\Aios\example_llamacpp_usage.py
+    main()

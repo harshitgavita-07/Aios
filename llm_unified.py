@@ -9,7 +9,7 @@ import logging
 from typing import Dict, List, Optional, Generator, Any, Union
 from pathlib import Path
 
-from .hardware import detect, recommend_model, recommend_gguf_model, get_llamacpp_config
+from hardware import detect, recommend_model, recommend_gguf_model, get_llamacpp_config
 
 log = logging.getLogger("aios.llm_unified")
 
@@ -43,7 +43,7 @@ class UnifiedLLMClient:
     def __init__(self,
                  preferred_backend: Optional[str] = None,
                  model_dir: str = "./models",
-                 ollama_host: str = "http://localhost:8080"):
+                 ollama_host: str = "http://localhost:11434"):
         """
         Initialize unified LLM client.
 
@@ -422,5 +422,4 @@ class UnifiedLLMClient:
 
     def get_current_model(self) -> Optional[str]:
         """Get current model."""
-        return self.current_model</content>
-<parameter name="filePath">c:\Users\HARSHIT\Aios\llm_unified.py
+        return self.current_model
