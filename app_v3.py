@@ -7,6 +7,7 @@ and on-device intelligence are the core UI paradigm.
 """
 
 import asyncio
+from typing import Optional
 import logging
 import sys
 from pathlib import Path
@@ -157,7 +158,7 @@ class AIOSApplication:
         finally:
             # Cleanup
             if self.runtime:
-                asyncio.run(shutdown_runtime())
+                asyncio.get_event_loop().run_until_complete(shutdown_runtime())
             log.info("AIOS shutdown complete")
 
     async def shutdown(self):
