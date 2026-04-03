@@ -1,228 +1,30 @@
 """
-Aios agent — central controller for the v2 runtime.
+AIOS Agent Controller — unified v2/v3 orchestrator.
 
-Pipeline:
-    user input
-        → Planner  (intent detection)
-        → SoulSync (emotion + tone)
-        → Memory   (conversation context)
-        → LLM / Tool Executor
-        → Memory   (save response)
-        → yield tokens to UI
+Fixes applied:
+  - Removed duplicate module-level v1 agent code that was concatenated
+    at the end of the file (caused SyntaxError: `self` in non-method scope).
+  - Removed duplicate process_stream() definition (second one shadowed first).
+  - Removed dangling references to `self.gstack` and bare `user_input` variable
+    inside the old module-level _handle_system() function.
+  - Fixed `from llm import LLMClient` -> `from core.llm import LLMClient`
+    so the class-based LLM client in core/ is used, not the old module.
 """
 
 from __future__ import annotations
 
 import logging
-import uuid
-from typing import Generator
-
-from core import memory, soulsync, planner as planner_mod
-from tools.registry import ToolRegistry
-
-log = logging.getLogger("aios.agent")
-
-# Module-level tool registry (initialised once)
-_registry = ToolRegistry()
-
-# Active session ID — resets on app start, cleared on "new chat"
-_session_id: str = str(uuid.uuid4())
-
-
-# ── Public API ────────────────────────────────────────────────────────────
-
-def session_id() -> str:
-    return _session_id
-
-
-def new_session() -> str:
-    global _session_id
-    _session_id = str(uuid.uuid4())
-    return _session_id
-
-
-def process(user_input: str) -> Generator[str, None, None]:
-    """
-    Main entry point called by the UI worker.
-
-    Yields string tokens (or full strings for tool/system responses).
-    """
-    text = user_input.strip()
-    if not text:
-        return
-    
-    # Handle very short inputs (greetings, etc.)
-    if len(text) < 3:
-        greeting_responses = [
-            "Hello! How can I help you today?",
-            "Hi there! What would you like to chat about?",
-            "Hey! I'm here to help. What's on your mind?",
-            "Greetings! How can I assist you?"
-        ]
-        import random
-        response = random.choice(greeting_responses)
-        memory.save(_session_id, "user", text)
-        memory.save(_session_id, "assistant", response)
-        yield response
-        return
-
-    # 1. Plan
-    plan = planner_mod.plan(text)
-    log.debug("plan=%s action=%s", plan.intent, plan.action)
-
-    # 2. Emotion analysis
-    soul = soulsync.analyse(text)
-    log.debug("emotion=%s conf=%.2f", soul.emotion, soul.confidence)
-
-    # 3. Save user message
-    memory.save(_session_id, "user", text, emotion=soul.emotion)
-
-    # 4. Route
-    if plan.intent == "system":
-        response = _handle_system(plan)
-        memory.save(_session_id, "assistant", response)
-        yield response
-        return
-
-    if plan.intent == "tool":
-        response = _handle_tool(plan)
-        memory.save(_session_id, "assistant", response)
-        yield response
-        return
-
-    # 5. Chat — stream through LLM with memory context
-    history = memory.history(_session_id)
-    full_response: list[str] = []
-
-    from llm import stream_with_history
-    for token in stream_with_history(
-        system_prompt=soul.system_prompt,
-        history=history,
-        user_input=text,
-    ):
-        full_response.append(token)
-        yield token
-
-    # 6. Save assistant response
-    memory.save(_session_id, "assistant", "".join(full_response))
-
-
-# ── System command handlers ───────────────────────────────────────────────
-
-def _handle_system(plan: planner_mod.Plan) -> str:
-    action = plan.action
-
-    if action == "clear_memory":
-        memory.clear_session(_session_id)
-        new_session()
-        return "Memory cleared. Starting a fresh session. 🧹"
-
-    if action == "list_models":
-        from llm import list_models
-        models = list_models()
-        if not models:
-            return "No models installed. Run: ollama pull llama3.2"
-        return "Installed models:\n" + "\n".join(f"  • {m}" for m in models)
-
-    if action == "current_model":
-        from llm import get_model
-        return f"Current model: {get_model()}"
-
-    if action == "show_hardware":
-        from llm import get_hw_info
-        hw = get_hw_info()
-        lines = [
-            f"GPU: {hw.get('gpu_name', 'none')}",
-            f"VRAM: {hw.get('vram_gb', 0)} GB",
-            f"RAM: {hw.get('ram_gb', 0)} GB",
-            f"CPU cores: {hw.get('cpu_cores', 0)}",
-            f"Backend: {hw.get('backend', 'cpu')}",
-        ]
-        return "\n".join(lines)
-
-    if action == "help":
-        help_text = (
-            "Aios v2 — what I can do:\n"
-            "  • Answer questions and have conversations\n"
-            "  • Remember what we've discussed this session\n"
-            "  • 'clear chat' — start a fresh session\n"
-            "  • 'list models' — show installed models\n"
-            "  • 'show hardware' — display GPU/CPU info\n"
-            "  • 'think about X' — structured reasoning step\n"
-            "  • Computer control: run commands, open apps, take screenshots\n"
-            "  • File operations: read/write files in allowed directories\n"
-            "  • System monitoring: check processes, system info\n"
-        )
-        
-        # Add gstack skills if available
-        if self.gstack and self.gstack.available:
-            help_text += "\n  • gstack skills available (use /skill-name)"
-        
-        return help_text
-
-    # Handle gstack commands
-    if action.startswith("gstack-") or action.startswith("/"):
-        if self.gstack:
-            skill_name = action.replace("gstack-", "").lstrip("/")
-            try:
-                result = self.gstack.run(f"/{skill_name}", plan.payload or user_input)
-                return f"gstack {skill_name}: {result.content}"
-            except Exception as e:
-                return f"gstack error: {e}"
-        else:
-            return "gstack not available. Install gstack for role-based skills."
-
-    return f"[system: {action}]"
-
-
-# ── Tool handlers ─────────────────────────────────────────────────────────
-
-def _handle_tool(plan: planner_mod.Plan) -> str:
-    action = plan.action
-
-    if action == "think":
-        import json
-        result = _registry.run("think_tool", json.dumps({"thought": plan.payload}))
-        try:
-            import json as _j
-            data = _j.loads(result)
-            thought = data.get("thought", plan.payload)
-            return f"💭 Thought: {thought}"
-        except Exception:
-            return result
-
-    # For other tools, check whitelist
-    tool_name = action
-    if not _registry.has(tool_name):
-        return (
-            f"Tool '{tool_name}' is not available. "
-            "Only whitelisted tools can be executed."
-        )
-
-    try:
-        return _registry.run(tool_name, plan.payload)
-    except Exception as e:
-        log.error("tool %s error: %s", tool_name, e)
-        return f"Tool error: {e}"
-
-"""
-Agent Controller — Main orchestrator for AIOS
-Coordinates memory, emotion, planning, tools, RAG, and LLM.
-"""
-
-import logging
-from typing import Optional, Dict, Any, List, Generator
+import random
 from pathlib import Path
+from typing import Any, Dict, Generator, List, Optional
 
 from .memory import MemoryStore
 from .soulsync import SoulSync
 from .planner import Planner, PlanStep
-from llm import LLMClient
+from .llm import LLMClient
 from .context_manager import ContextManager
 from .mode_controller import ModeController, AgentMode
 from .confidence import ConfidenceScorer
-
-# Import RAG
 from rag.pipeline import RAGPipeline
 
 log = logging.getLogger("aios.agent")
@@ -230,32 +32,27 @@ log = logging.getLogger("aios.agent")
 
 class AgentController:
     """
-    Central controller for the AIOS agent system v2.
-    
-    Flow:
-    User Input → Agent Controller → Mode Detection → [Memory-RAG | Web-RAG | Tools]
-              → SoulSync → Context Manager → LLM → Confidence Check → Response
-    
-    Change: Enhanced agent with RAG, Context Manager, and Confidence
-    Why:
-    - Previous system lacked knowledge retrieval
-    - Context window needed intelligent management
-    - Response quality needed verification
-    Impact:
-    - Research capability
-    - Optimal context usage
-    - Quality guarantees
+    Central controller for the AIOS agent system.
+
+    Pipeline:
+        user input
+            → SoulSync  (emotion + tone)
+            → ModeController (chat / tool / web)
+            → RAG / tool execution (optional)
+            → ContextManager (build optimised prompt)
+            → LLMClient  (generate / stream)
+            → ConfidenceScorer
+            → MemoryStore (save)
     """
 
     def __init__(self, data_dir: Optional[Path] = None):
         self.data_dir = data_dir or Path(__file__).parent.parent / "data"
         self.data_dir.mkdir(exist_ok=True)
-        
+
         log.info("=" * 50)
-        log.info("Initializing AIOS Agent Controller v2")
+        log.info("Initializing AIOS AgentController")
         log.info("=" * 50)
-        
-        # Initialize core components
+
         self.memory = MemoryStore(self.data_dir)
         self.soulsync = SoulSync(self.data_dir)
         self.llm = LLMClient(self.data_dir)
@@ -263,362 +60,281 @@ class AgentController:
         self.context_manager = ContextManager(max_tokens=4096)
         self.mode_controller = ModeController()
         self.confidence_scorer = ConfidenceScorer()
-        
-        # Initialize RAG pipeline
         self.rag = RAGPipeline(self.data_dir)
-        
-        # Initialize gstack runner
+        self.tool_executor = None
+
+        # Optional gstack integration
         try:
             from gstack.aios_gstack import GStackRunner
             self.gstack = GStackRunner()
-            log.info("gstack integration initialized")
+            log.info("gstack integration initialised")
         except ImportError:
             self.gstack = None
-            log.warning("gstack not available - install gstack for role-based skills")
-        
-        # Tool executor (set later)
-        self.tool_executor = None
-        
-        log.info("AgentController initialization complete")
 
-    def set_tool_executor(self, executor):
-        """Set the tool executor for the agent."""
+        log.info("AgentController initialisation complete")
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def set_tool_executor(self, executor) -> None:
         self.tool_executor = executor
         self.planner.tool_registry = executor
 
-    def process(self, user_input: str, 
-                show_thinking: bool = True) -> Dict[str, Any]:
+    def handle_message(self, message: Dict[str, Any]) -> None:
         """
-        Process user input with full pipeline.
-        
-        Change: Enhanced processing with thinking steps
-        Why:
-        - Users want transparency on processing
-        - Shows what's happening behind the scenes
-        - Better for debugging
-        Impact:
-        - Transparent processing
-        - Better user understanding
+        Handle an inter-agent message (used by the v3 AgentMesh).
+        Processes messages routed from the runtime layer.
         """
-        thinking_steps = []
-        
-        def add_step(step: str):
-            thinking_steps.append({"step": len(thinking_steps) + 1, "message": step})
-            log.info(f"[Thinking] {step}")
-        
+        msg_type = message.get("type", "")
+        if msg_type == "llm_generation":
+            prompt = message.get("prompt", "")
+            if prompt:
+                self.llm.generate(prompt)
+        elif msg_type == "tool_execution":
+            tool = message.get("tool", "")
+            params = message.get("parameters", {})
+            if tool and self.tool_executor:
+                try:
+                    self.tool_executor.execute(tool, params)
+                except Exception as e:
+                    log.error("Tool execution in handle_message failed: %s", e)
+        else:
+            log.debug("Unhandled message type in handle_message: %s", msg_type)
+
+    def process(self, user_input: str, show_thinking: bool = True) -> Dict[str, Any]:
+        """Synchronous full-pipeline processing. Returns result dict."""
+        thinking_steps: List[Dict] = []
+
+        def add_step(msg: str):
+            thinking_steps.append({"step": len(thinking_steps) + 1, "message": msg})
+            log.info("[Thinking] %s", msg)
+
         try:
-            # Step 1: Save user message
-            self.memory.add_message("user", user_input)
+            # Short-circuit for very short inputs
+            text = user_input.strip()
+            if len(text) < 3:
+                response = random.choice([
+                    "Hello! How can I help you today?",
+                    "Hi there! What would you like to chat about?",
+                    "Hey! I'm here to help. What's on your mind?",
+                ])
+                self.memory.add_message("assistant", response,
+                                        metadata={"emotion": "neutral"})
+                return {
+                    "response": response,
+                    "thinking_steps": [],
+                    "confidence": None,
+                    "mode": "chat",
+                    "sources": [],
+                    "emotion": "neutral",
+                }
+
+            self.memory.add_message("user", text)
             add_step("Received user input")
-            
-            # Step 2: Detect emotion
-            emotion = self.soulsync.detect_emotion(user_input)
+
+            emotion = self.soulsync.detect_emotion(text)
             add_step(f"Detected emotion: {emotion.dominant}")
-            
-            # Step 3: Detect mode
-            mode_decision = self.mode_controller.detect_mode(user_input)
+
+            mode_decision = self.mode_controller.detect_mode(text)
             add_step(f"Mode: {mode_decision.mode.value} ({mode_decision.reasoning})")
-            
-            # Step 4: Gather knowledge based on mode
-            rag_results = []
-            web_results = []
-            tool_results = []
-            
+
+            rag_results: List[Dict] = []
+            web_results: List[Dict] = []
+            tool_results: Dict = {}
+
             if mode_decision.requires_web:
-                add_step("🔍 Researching web...")
-                rag_results = self.rag.research(user_input)
+                add_step("Researching web...")
+                rag_results = self.rag.research(text)
                 add_step(f"Found {len(rag_results)} relevant sources")
-                web_results = [{"content": r["content"], "source": r.get("url", "")} 
-                              for r in rag_results[:3]]
-            
-            # Retrieve from local memory/knowledge
-            memory_rag = self.rag.query(user_input, use_web=False)
+                web_results = [
+                    {"content": r["content"], "source": r.get("url", "")}
+                    for r in rag_results[:3]
+                ]
+
+            memory_rag = self.rag.query(text, use_web=False)
             if memory_rag:
-                add_step(f"📚 Retrieved {len(memory_rag)} items from knowledge base")
+                add_step(f"Retrieved {len(memory_rag)} items from knowledge base")
                 rag_results.extend(memory_rag)
-            
+
             if mode_decision.requires_tools and self.tool_executor:
-                add_step("🔧 Executing tools...")
-                intent = self.planner.detect_intent(user_input)
-                plan = self.planner.create_plan(user_input, intent)
+                add_step("Executing tools...")
+                intent = self.planner.detect_intent(text)
+                plan = self.planner.create_plan(text, intent)
                 if plan:
-                    plan_result = self.planner.execute_plan(
-                        plan, 
+                    tool_results = self.planner.execute_plan(
+                        plan,
                         tool_executor=self.tool_executor,
-                        llm_client=self.llm
+                        llm_client=self.llm,
                     )
-                    tool_results = plan_result
                     add_step("Tool execution complete")
-            
-            # Step 5: Build optimized context
-            add_step("🧠 Building context...")
+
+            add_step("Building context...")
             memory_context = self.memory.get_formatted_history(limit=10)
-            
             tone_modifier = self.soulsync.get_system_prompt_modifier()
             system_prompt = self._build_system_prompt(tone_modifier)
-            
+
             context = self.context_manager.build_context(
-                user_query=user_input,
+                user_query=text,
                 memory_messages=memory_context,
                 rag_results=rag_results,
                 web_results=web_results,
                 tool_results=tool_results,
-                system_prompt=system_prompt
+                system_prompt=system_prompt,
             )
-            
-            # Step 6: Generate response
-            add_step("✍️ Generating response...")
-            response = self.llm.generate(user_input, system_prompt, context)
-            
-            # Step 7: Score confidence
+
+            add_step("Generating response...")
+            response = self.llm.generate(text, system_prompt, context)
+
             sources = [r.get("source", "memory") for r in rag_results]
             confidence = self.confidence_scorer.score_response(
-                response, 
-                sources, 
-                mode_decision.mode.value,
-                has_rag=bool(rag_results),
-                has_web=bool(web_results)
+                response, sources, mode_decision.mode.value,
+                has_rag=bool(rag_results), has_web=bool(web_results),
             )
-            
+
             if confidence.should_fallback:
-                response = self.confidence_scorer.get_fallback_response(user_input, confidence)
-                add_step(f"⚠️ Low confidence ({confidence.level.value}), using fallback")
+                response = self.confidence_scorer.get_fallback_response(
+                    text, confidence)
+                add_step(f"Low confidence ({confidence.level.value}), using fallback")
             else:
-                add_step(f"✓ Confidence: {confidence.level.value}")
-            
-            # Step 8: Save response
+                add_step(f"Confidence: {confidence.level.value}")
+
             self.memory.add_message("assistant", response, metadata={
                 "emotion": emotion.dominant,
                 "mode": mode_decision.mode.value,
                 "confidence": confidence.overall,
-                "sources": sources[:3]
+                "sources": sources[:3],
             })
-            
-            # Learn from interaction
-            self.soulsync.learn_from_interaction(user_input, mode_decision.mode.value)
-            
+            self.soulsync.learn_from_interaction(text, mode_decision.mode.value)
+
             return {
                 "response": response,
                 "thinking_steps": thinking_steps if show_thinking else [],
                 "confidence": confidence,
                 "mode": mode_decision.mode.value,
                 "sources": sources[:3],
-                "emotion": emotion.dominant
+                "emotion": emotion.dominant,
             }
-            
+
         except Exception as e:
-            log.error(f"Error processing input: {e}")
+            log.error("Error processing input: %s", e)
             return {
-                "response": f"I encountered an error: {str(e)}. Please try again.",
+                "response": f"I encountered an error: {e}. Please try again.",
                 "thinking_steps": thinking_steps,
                 "confidence": None,
                 "mode": "error",
                 "sources": [],
-                "emotion": "neutral"
+                "emotion": "neutral",
             }
 
     def process_stream(self, user_input: str) -> Generator[Dict[str, Any], None, None]:
         """
-        Process user input and yield streaming updates.
-        
-        Change: Streaming with thinking steps
-        Why:
-        - Users want real-time progress
-        - Shows what's happening
-        - Better for long operations
-        Impact:
-        - Real-time transparency
-        - Better perceived performance
+        Stream processing: yields typed dicts consumed by StreamWorker in chat_ui.py.
+
+        Yielded dict shapes:
+          {"type": "thinking", "message": str}
+          {"type": "mode",     "mode": str}
+          {"type": "sources",  "data": {"count": int, "sources": list}}
+          {"type": "token",    "content": str}
+          {"type": "complete", "confidence": str}
+          {"type": "error",    "message": str}
         """
         try:
             text = user_input.strip()
             if not text:
                 return
-            
-            # Handle very short inputs (greetings, etc.)
+
             if len(text) < 3:
-                greeting_responses = [
+                response = random.choice([
                     "Hello! How can I help you today?",
                     "Hi there! What would you like to chat about?",
                     "Hey! I'm here to help. What's on your mind?",
-                    "Greetings! How can I assist you?"
-                ]
-                import random
-                response = random.choice(greeting_responses)
-                self.memory.add_message("assistant", response, metadata={"emotion": "neutral"})
+                ])
+                self.memory.add_message("assistant", response,
+                                        metadata={"emotion": "neutral"})
                 yield {"type": "token", "content": response}
                 yield {"type": "complete", "confidence": "HIGH"}
                 return
-            
-            yield {"type": "thinking", "message": "Analyzing request..."}
-            
-            # Save and detect
+
+            yield {"type": "thinking", "message": "Analysing request..."}
+
             self.memory.add_message("user", text)
             emotion = self.soulsync.detect_emotion(text)
             mode_decision = self.mode_controller.detect_mode(text)
-            
+
             yield {"type": "mode", "mode": mode_decision.mode.value}
-            
-            # Gather knowledge
-            rag_results = []
-            web_results = []
-            
+
+            rag_results: List[Dict] = []
+            web_results: List[Dict] = []
+
             if mode_decision.requires_web:
-                yield {"type": "thinking", "message": "🔍 Searching web..."}
-                rag_results = self.rag.research(user_input)
-                yield {"type": "sources", "data": {"count": len(rag_results), "sources": rag_results[:5]}}
-                web_results = [{"content": r["content"], "source": r.get("url", ""), "title": r.get("title", "")} 
-                              for r in rag_results[:3]]
-            
-            # Build context and generate
-            yield {"type": "thinking", "message": "🧠 Generating response..."}
-            
+                yield {"type": "thinking", "message": "Searching web..."}
+                rag_results = self.rag.research(text)
+                yield {"type": "sources",
+                       "data": {"count": len(rag_results),
+                                "sources": rag_results[:5]}}
+                web_results = [
+                    {"content": r["content"],
+                     "source": r.get("url", ""),
+                     "title": r.get("title", "")}
+                    for r in rag_results[:3]
+                ]
+
+            yield {"type": "thinking", "message": "Generating response..."}
+
             memory_context = self.memory.get_formatted_history(limit=10)
             tone_modifier = self.soulsync.get_system_prompt_modifier()
             system_prompt = self._build_system_prompt(tone_modifier)
-            
+
             context = self.context_manager.build_context(
-                user_query=user_input,
+                user_query=text,
                 memory_messages=memory_context,
                 rag_results=rag_results,
                 web_results=web_results,
-                system_prompt=system_prompt
+                system_prompt=system_prompt,
             )
-            
-            # Stream tokens
-            full_response = []
-            for token in self.llm.generate_stream(user_input, system_prompt, context):
+
+            full_response: List[str] = []
+            for token in self.llm.generate_stream(text, system_prompt, context):
                 full_response.append(token)
                 yield {"type": "token", "content": token}
-            
+
             complete_response = "".join(full_response)
-            
-            # Score and save
+
             sources = [r.get("source", "memory") for r in rag_results]
             confidence = self.confidence_scorer.score_response(
                 complete_response, sources, mode_decision.mode.value,
-                has_rag=bool(rag_results), has_web=bool(web_results)
+                has_rag=bool(rag_results), has_web=bool(web_results),
             )
-            
+
             self.memory.add_message("assistant", complete_response, metadata={
                 "emotion": emotion.dominant,
                 "mode": mode_decision.mode.value,
                 "confidence": confidence.overall,
-                "sources": sources[:3]
+                "sources": sources[:3],
             })
-            
+
             yield {"type": "complete", "confidence": confidence.level.value}
-            
+
         except Exception as e:
-            log.error(f"Error in streaming: {e}")
+            log.error("Error in process_stream: %s", e)
             yield {"type": "error", "message": str(e)}
 
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
     def _build_system_prompt(self, tone_modifier: str) -> str:
-        """Build comprehensive system prompt with professional Claude patterns and AIOS capabilities."""
-        base_prompt = (
-            "# AIOS - Advanced Intelligent Operating System\n\n"
+        base = (
             "You are AIOS, an advanced local AI assistant running on the user's machine. "
-            "You combine the precision and professionalism of Claude with the warmth and personality of a trusted companion.\n\n"
-            
-            "## Core Capabilities\n"
-            "- **Local Processing**: All operations happen on-device - no data leaves the user's machine\n"
-            "- **Memory & Context**: Persistent conversation memory with emotion-aware responses\n"
-            "- **Research & RAG**: Local vector database with web search integration when needed\n"
-            "- **Tool Execution**: Secure computer control (commands, apps, screenshots, file operations)\n"
-            "- **Sports Expertise**: Deep knowledge of cricket, IPL, and sports analysis\n"
-            "- **Code Assistance**: Help with programming, debugging, and software engineering\n\n"
-            
-            "## Professional Communication Standards\n"
-            "### Tone and Style\n"
-            "- Be direct, honest, and technically accurate\n"
-            "- Prioritize facts and problem-solving over validation of user beliefs\n"
-            "- Use warm, constructive communication without excessive praise\n"
-            "- Avoid emojis unless explicitly requested by the user\n"
-            "- Keep responses concise but comprehensive\n"
-            "- Never give time estimates for tasks\n\n"
-            
-            "### Task Management\n"
-            "- Break complex tasks into clear, actionable steps\n"
-            "- Track progress transparently when working through multi-step processes\n"
-            "- Mark tasks as complete only when actually finished\n"
-            "- Ask clarifying questions when requirements are ambiguous\n"
-            "- Focus on what needs to be done, not how long it might take\n\n"
-            
-            "### Code and Technical Work\n"
-            "- Read existing code before suggesting modifications\n"
-            "- Prefer editing existing files over creating new ones\n"
-            "- Include clear file paths and line numbers when referencing code\n"
-            "- Explain technical concepts when needed, but don't oversimplify\n"
-            "- Focus on functionality over perfection in initial implementations\n\n"
-            
-            "## Cricket & Sports Expertise\n"
-            "When discussing cricket, IPL, or sports:\n"
-            "- Provide detailed tactical analysis of team compositions and strategies\n"
-            "- Discuss pitch conditions, weather impact, and match scenarios\n"
-            "- Share historical context, records, and performance trends\n"
-            "- Compare player strengths, weaknesses, and roles\n"
-            "- Offer strategic insights even without live data\n"
-            "- Use cricket terminology naturally while explaining when needed\n"
-            "- Be passionate and knowledgeable about the sport\n\n"
-            
-            "## Human-like Writing Patterns\n"
-            "Write naturally like a human expert, not like AI:\n"
-            "- Avoid overusing words like 'stands as', 'serves as', 'pivotal', 'key role'\n"
-            "- Skip promotional language: 'vibrant', 'rich', 'profound', 'breathtaking'\n"
-            "- Don't use vague attributions like 'Industry reports show' or 'Experts argue'\n"
-            "- Avoid superficial -ing phrases: 'highlighting...', 'underscoring...'\n"
-            "- Don't force ideas into groups of three or elegant variation\n"
-            "- Minimize em dashes (—) and boldface (**) in regular text\n"
-            "- Skip negative parallelisms and passive voice fragments\n"
-            "- Avoid filler phrases: 'In order to', 'Due to the fact that'\n"
-            "- Don't hedge excessively or use signposting phrases\n"
-            "- Write with personality: have opinions, vary sentence length, acknowledge complexity\n"
-            "- Use 'I' when appropriate and sound like a real person thinking out loud\n\n"
-            
-            "## Tool Usage Guidelines\n"
-            "- Use tools proactively when they add value to the response\n"
-            "- Explain tool usage clearly when it affects the user\n"
-            "- Prefer local tools and knowledge over external dependencies\n"
-            "- Be transparent about when web search or external tools are used\n"
-            "- Cite sources clearly when using web or research results\n\n"
-            
-            "## Error Handling & Honesty\n"
-            "- If you don't know something, say so clearly\n"
-            "- Don't make up information or pretend to know more than you do\n"
-            "- When uncertain, investigate rather than assume\n"
-            "- Be honest about limitations and capabilities\n"
-            "- Provide fallback responses when confidence is low\n\n"
-            
-            "## Security & Privacy\n"
-            "- Respect user privacy - all processing is local\n"
-            "- Only execute whitelisted tools and commands\n"
-            "- Be cautious with file operations and system commands\n"
-            "- Never attempt to bypass security restrictions\n"
-            "- Log actions transparently for user awareness\n\n"
-            
-            "Remember: You are AIOS - helpful, professional, and deeply knowledgeable about cricket and technology. "
-            "Combine the precision of Claude with genuine human-like communication."
+            "All processing is on-device — no data leaves this device. "
+            "Be direct, honest, concise, and technically accurate. "
+            "Use warm, constructive communication without excessive praise. "
+            "If you don't know something, say so clearly."
         )
-        
-        # Add emotion-based tone modifier
-        full_prompt = base_prompt + "\n\n" + tone_modifier
-        
-        # Add current context and capabilities
-        full_prompt += (
-            "\n\n## Current Session Context\n"
-            "- You have access to conversation memory and can reference past discussions\n"
-            "- Web search and research capabilities are available when needed\n"
-            "- Computer control tools allow safe system interaction\n"
-            "- Local knowledge base provides context-aware responses\n"
-            "- Emotion detection helps tailor responses appropriately\n\n"
-            
-            "Always prioritize user safety, accuracy, and helpfulness in all interactions."
-        )
-        
-        return full_prompt
+        return base + "\n\n" + tone_modifier
 
     def get_status(self) -> Dict[str, Any]:
-        """Get agent status summary."""
         return {
             "model": self.llm.get_model(),
             "hardware": self.llm.get_hardware_info(),
@@ -628,68 +344,8 @@ class AgentController:
             "profile": self.soulsync.profile.name or "not set",
         }
 
-    def clear_conversation(self):
-        """Clear current conversation thread."""
+    def clear_conversation(self) -> None:
         self.memory.clear_thread()
 
-    def set_user_name(self, name: str):
-        """Set user's name in profile."""
+    def set_user_name(self, name: str) -> None:
         self.soulsync.update_profile(name=name)
-
-    def set_research_mode(self, enabled: bool):
-        """Toggle research mode."""
-        # This can be used to force web search
-        pass
-
-    def process_stream(self, user_input: str) -> Generator[Dict[str, Any], None, None]:
-        """
-        Process user input and yield streaming updates for UI compatibility.
-        
-        This method wraps the synchronous process() method to provide
-        streaming updates that the UI expects.
-        """
-        try:
-            # Yield thinking steps as they happen
-            yield {"type": "thinking", "message": "Processing your request..."}
-            
-            # Call the main process method
-            result = self.process(user_input, show_thinking=False)
-            
-            # Yield mode detection
-            yield {"type": "mode", "mode": result.get("mode", "chat")}
-            
-            # Yield sources if any
-            sources = result.get("sources", [])
-            if sources:
-                yield {"type": "sources", "data": {"count": len(sources), "sources": sources}}
-            
-            # Yield thinking steps from the result
-            for step in result.get("thinking_steps", []):
-                yield {"type": "thinking", "message": step["message"]}
-            
-            # Yield the response as tokens (simulate streaming)
-            response = result.get("response", "")
-            if response:
-                # Split response into tokens (words) for streaming effect
-                words = response.split()
-                for word in words:
-                    yield {"type": "token", "content": word + " "}
-                    # Small delay to simulate streaming (optional)
-                    import time
-                    time.sleep(0.01)
-            
-            # Yield completion with confidence
-            confidence = result.get("confidence")
-            if confidence:
-                confidence_str = f"{confidence.level.value} ({confidence.overall:.2f})"
-            else:
-                confidence_str = "UNKNOWN"
-            
-            yield {"type": "complete", "confidence": confidence_str}
-            
-        except Exception as e:
-            log.error(f"Error in process_stream: {e}")
-            yield {"type": "error", "message": str(e)}
-
-
-
