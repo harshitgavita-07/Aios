@@ -340,7 +340,9 @@ class AgentController:
             "hardware": self.llm.get_hardware_info(),
             "memory_stats": self.memory.get_stats(),
             "rag_stats": self.rag.get_stats(),
+            # Fix Bug 9: current_emotion is always initialised now (never None)
             "emotion": self.soulsync.current_emotion.dominant,
+            # Fix Bug 3: SoulSync.profile is now a stub with .name attribute
             "profile": self.soulsync.profile.name or "not set",
         }
 
