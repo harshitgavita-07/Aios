@@ -1,29 +1,33 @@
-# AIOS v2.0 — Core Dependencies
+# AIOS — Core Dependencies (covers v1, v2, and v3)
+# Run: pip install -r requirements.txt
 
-# Qt UI Framework
-PySide6>=6.7.0
+# ── Qt UI Framework ───────────────────────────────────────────────
+PySide6>=6.6.0
 
-# LLM Integration
+# ── LLM Backends ─────────────────────────────────────────────────
+# Ollama SDK (recommended, easiest setup)
 ollama>=0.4.0
 
-# Optional: llama.cpp for direct C++ inference (faster, more control)
-# pip install llama-cpp-python
-# For CUDA support: pip install llama-cpp-python[cuBLAS]
-# For Metal support (macOS): pip install llama-cpp-python[metal]
+# llama.cpp Python bindings (optional — for direct GGUF inference)
+# Uncomment and install for llama.cpp support:
+# llama-cpp-python>=0.2.0
 
-# System Information
-psutil>=5.9.0
-
-# RAG Components (optional but recommended)
-# For local embeddings and vector search:
+# ── RAG / Embeddings / Vector Search ─────────────────────────────
 sentence-transformers>=2.2.0
 faiss-cpu>=1.7.0
 numpy>=1.24.0
 
-# Optional: Enhanced GPU profiling
-# pip install pyaccelerate
+# ── Web Search + Content Fetching ────────────────────────────────
+requests>=2.31.0
+beautifulsoup4>=4.12.0
 
-# Development dependencies (uncomment for dev)
-# pytest>=7.0.0
-# black>=23.0.0
-# pylint>=2.17.0
+# ── System Monitoring ────────────────────────────────────────────
+psutil>=5.9.0
+
+# ── Optional: Screenshot + Window Control ────────────────────────
+# Uncomment if you want computer control tools:
+# pillow>=10.0.0
+# pygetwindow>=0.0.9   # Windows only
+
+# ── Optional: GPU Profiling ──────────────────────────────────────
+# pyaccelerate>=0.20.0

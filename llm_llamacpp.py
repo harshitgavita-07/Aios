@@ -25,7 +25,14 @@ from pathlib import Path
 from typing import Dict, Generator, List, Optional, Any, Union
 from concurrent.futures import ThreadPoolExecutor
 
-import numpy as np
+# Fix: numpy imported unconditionally — crashes startup if not installed.
+# Guard it so llm_llamacpp loads even without numpy.
+try:
+    import numpy as np
+    _NUMPY_AVAILABLE = True
+except ImportError:
+    np = None
+    _NUMPY_AVAILABLE = False
 
 log = logging.getLogger("aios.llm.llamacpp")
 
