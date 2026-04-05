@@ -4,20 +4,10 @@ aios_core.py
 AIOS — Local AI Operating System
 Central orchestrator: routes input → skill → Ollama → memory → output.
 
-Architecture:
-    User Input
-        → Router      (picks the right gstack skill)
-        → Skills      (role-based system prompt from gstack)
-        → Ollama      (local LLM execution)
-        → Memory      (persists input/output)
-        → Output
-
-Usage:
-    from aios_core import AIOS
-
-    aios = AIOS(model="llama3")
-    result = aios.run("build a NLP library for Hindi")
-    result = aios.run("/review", task="check the auth module for bugs")
+Fix: `from core.ollama_client import ...` was a wrong import path.
+     Inside the gstack package, imports must be relative or use the full
+     gstack.core prefix. Changed to `from gstack.core.ollama_client`.
+     Same fix applied to skills, router and memory imports.
 """
 
 from __future__ import annotations
@@ -27,10 +17,13 @@ import sys
 from dataclasses import dataclass
 from typing import Optional, Generator
 
-from core.ollama_client import generate, generate_stream, health_check, list_models
-from core.skills import get_skill, list_skills, Skill
-from core.router import route, route_explicit
-from core import memory
+# Fix: was `from core.ollama_client` — that resolves to the top-level
+# core/ package (core/agent.py etc), not gstack/core/.
+# Correct path is gstack.core.* (absolute) or .core.* (relative).
+from gstack.core.ollama_client import generate, generate_stream, health_check, list_models
+from gstack.core.skills import get_skill, list_skills, Skill
+from gstack.core.router import route, route_explicit
+from gstack.core import memory
 
 log = logging.getLogger("aios")
 
@@ -79,7 +72,7 @@ class AIOS:
 
         log.info("AIOS initialised. model=%s", model)
 
-    # ── Main entry points ─────────────────────────────────────────────────
+    # ── Main entry points ──────────────────────────────────────────────
 
     def run(
         self,
@@ -94,24 +87,19 @@ class AIOS:
         Args:
             command_or_input: Either an explicit command ("/review") or
                               natural language ("build a NLP library").
-            task: Optional separate task description if command_or_input
-                  is an explicit skill command.
+            task: Optional separate task description.
             stream: If True, prints tokens to stdout as they arrive.
             include_context: If True, appends recent task history to prompt.
 
         Returns:
             TaskResult with output and metadata.
         """
-        # Resolve skill
         if task is not None:
-            # Explicit command + separate task
             skill_name = route_explicit(command_or_input) or route(command_or_input)
             user_input = task
         else:
-            # Natural language or explicit command (no separate task)
             skill_name = route_explicit(command_or_input)
             if skill_name:
-                # Pure command with no task — ask what they mean
                 user_input = f"Run the {skill_name} skill. No specific task provided."
             else:
                 skill_name = route(command_or_input)
@@ -119,16 +107,13 @@ class AIOS:
 
         skill = get_skill(skill_name)
         if not skill:
-            # Shouldn't happen, but be safe
             skill_name = "plan-ceo-review"
             skill = get_skill(skill_name)
 
         log.info("skill=%s model=%s", skill_name, self.model)
 
-        # Build prompt
         prompt = self._build_prompt(user_input, skill, include_context)
 
-        # Execute
         try:
             if stream:
                 output = self._run_stream(prompt, skill)
@@ -174,78 +159,54 @@ class AIOS:
         """Convenience wrapper for run() with stream=True."""
         return self.run(command_or_input, task=task, stream=True)
 
-    # ── Convenience methods for explicit skills ───────────────────────────
-
     def plan(self, task: str) -> TaskResult:
-        """Run /plan-ceo-review on a task."""
         return self.run("/plan-ceo-review", task=task)
 
     def eng_plan(self, task: str) -> TaskResult:
-        """Run /plan-eng-review on a task."""
         return self.run("/plan-eng-review", task=task)
 
     def review(self, task: str) -> TaskResult:
-        """Run /review on code or a description."""
         return self.run("/review", task=task)
 
     def qa(self, task: str) -> TaskResult:
-        """Run /qa on an implementation."""
         return self.run("/qa", task=task)
 
     def ship(self, task: str) -> TaskResult:
-        """Run /ship pre-ship checklist."""
         return self.run("/ship", task=task)
 
     def investigate(self, bug: str) -> TaskResult:
-        """Run /investigate on a bug."""
         return self.run("/investigate", task=bug)
 
     def office_hours(self, idea: str) -> TaskResult:
-        """Run /office-hours on a product idea."""
         return self.run("/office-hours", task=idea)
 
-    # ── Status ────────────────────────────────────────────────────────────
-
     def status(self) -> dict:
-        """Return current system status."""
         models = list_models()
         return {
             "ollama_running": health_check(),
-            "current_model":  self.model,
+            "current_model": self.model,
             "model_available": self.model in models,
             "installed_models": models,
             "available_skills": list_skills(),
             "task_count": len(memory.recent_tasks(n=9999)),
         }
 
-    def history(self, n: int = 10) -> list[dict]:
-        """Return recent task history."""
+    def history(self, n: int = 10) -> list:
         return memory.recent_tasks(n=n)
 
-    # ── Internal ──────────────────────────────────────────────────────────
-
-    def _build_prompt(
-        self,
-        user_input: str,
-        skill: Skill,
-        include_context: bool,
-    ) -> str:
+    def _build_prompt(self, user_input: str, skill: Skill, include_context: bool) -> str:
         parts = []
-
         if include_context:
             ctx = memory.get_context(n=3)
             if ctx:
                 parts.append(ctx)
                 parts.append("")
-
         parts.append(f"## Task\n{user_input}")
-
         return "\n".join(parts)
 
     def _run_stream(self, prompt: str, skill: Skill) -> str:
-        """Stream tokens to stdout, return full response."""
         print(f"\n[{skill.role}]\n", flush=True)
-        tokens: list[str] = []
+        tokens: list = []
         for token in generate_stream(
             prompt=prompt,
             model=self.model,

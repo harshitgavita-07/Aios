@@ -36,7 +36,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from aios_core import AIOS, TaskResult
+# Fix: was `from aios_core import ...` — bare import only works if
+# Python is launched from inside gstack/. Use absolute package path.
+from gstack.aios_core import AIOS, TaskResult
 
 log = logging.getLogger("aios.gstack")
 
