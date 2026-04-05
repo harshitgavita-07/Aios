@@ -576,7 +576,9 @@ class SystemTools:
     def get_tools_dict(self) -> Dict[str, callable]:
         """Get all tools as a dictionary for registration."""
         return {
-            "think": self.think,
+            # Fix Bug 5: registry whitelist uses "think_tool", not "think".
+            # Registering as "think_tool" makes it callable via ToolRegistry.
+            "think_tool": self.think,
             "calculator": self.calculator,
             "file_read": self.file_read,
             "file_write": self.file_write,

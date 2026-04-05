@@ -50,7 +50,11 @@ class SoulSync:
         self.emotion_lexicon = self._build_lexicon()
         self.personality_profiles = self._load_personality_profiles()
         self.emotional_memory = []
-        self.current_emotion = None
+        # Fix Bug 3: profile stub so AgentController.get_status() can access .profile.name
+        class _Profile:
+            name: str = ""
+        self.profile = _Profile()
+        self.current_emotion = EmotionState(dominant="neutral", intensity=0.5, confidence=0.5)
         log.info("SoulSync initialized")
 
     def _build_lexicon(self) -> Dict[str, List[str]]:
@@ -272,10 +276,11 @@ class SoulSync:
         - More appropriate responses
         - Better user satisfaction
         """
-        if emotion_state.primary_emotion == "neutral" or emotion_state.confidence < 0.6:
+        # Fix Bug 2: EmotionState field is .dominant, not .primary_emotion
+        if emotion_state.dominant == "neutral" or emotion_state.confidence < 0.6:
             return base_response
         
-        profile = self.personality_profiles.get(emotion_state.primary_emotion, self.personality_profiles["neutral"])
+        profile = self.personality_profiles.get(emotion_state.dominant, self.personality_profiles["neutral"])
         
         # Add emotional prefix
         prefix = profile["prompt_modifier"]
@@ -309,18 +314,16 @@ class SoulSync:
 
     def get_context(self) -> Dict:
         """Get current emotional context for UI."""
-        if self.current_emotion:
-            return {"emotion": {"dominant": self.current_emotion.dominant}}
-        else:
-            return {"emotion": {"dominant": "neutral"}}
+        # Fix Bug 9: current_emotion is now initialised to neutral, never None
+        return {"emotion": {"dominant": self.current_emotion.dominant}}
 
     def get_system_prompt_modifier(self) -> str:
         """Get system prompt modifier based on current emotion."""
-        if self.current_emotion:
-            profile = self.personality_profiles.get(self.current_emotion.dominant, self.personality_profiles["neutral"])
-            return profile["prompt_modifier"]
-        else:
-            return ""
+        # Fix Bug 9: current_emotion always has a value now
+        profile = self.personality_profiles.get(
+            self.current_emotion.dominant, self.personality_profiles["neutral"]
+        )
+        return profile["prompt_modifier"]
 
     def learn_from_interaction(self, user_input: str, mode: str):
         """Learn from user interaction to improve emotion detection."""

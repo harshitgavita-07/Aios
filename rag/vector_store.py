@@ -72,16 +72,22 @@ class FAISSStore:
         - Persistent storage
         - Data durability
         """
+        # Fix Bug 4: faiss was only imported inside _load_or_create_index();
+        # normalize_L2 calls in add/add_batch/search crashed with NameError.
         import numpy as np
+        try:
+            import faiss as _faiss
+        except ImportError:
+            _faiss = None
         
         doc_copy = document.copy()
         doc_copy["_id"] = self._doc_id
         doc_copy["_added_at"] = datetime.now().isoformat()
         
-        if self._index is not None:
+        if self._index is not None and _faiss is not None:
             # Normalize for cosine similarity
             emb_array = np.array([embedding], dtype=np.float32)
-            faiss.normalize_L2(emb_array)
+            _faiss.normalize_L2(emb_array)
             self._index.add(emb_array)
         
         self._documents.append(doc_copy)
@@ -95,14 +101,19 @@ class FAISSStore:
 
     def add_batch(self, embeddings: List[List[float]], documents: List[Dict]):
         """Add multiple documents."""
+        # Fix Bug 4: guard faiss import
         import numpy as np
+        try:
+            import faiss as _faiss
+        except ImportError:
+            _faiss = None
         
         if not embeddings or not documents:
             return
         
-        if self._index is not None:
+        if self._index is not None and _faiss is not None:
             emb_array = np.array(embeddings, dtype=np.float32)
-            faiss.normalize_L2(emb_array)
+            _faiss.normalize_L2(emb_array)
             self._index.add(emb_array)
         
         for doc in documents:
@@ -127,13 +138,18 @@ class FAISSStore:
         - Fast retrieval
         """
         import numpy as np
-        
+
         if self._index is None or len(self._documents) == 0:
             return []
         
+        # Fix Bug 4: guard faiss import
+        try:
+            import faiss as _faiss
+        except ImportError:
+            return []
         # Normalize query
         query_array = np.array([query_embedding], dtype=np.float32)
-        faiss.normalize_L2(query_array)
+        _faiss.normalize_L2(query_array)
         
         # Search
         scores, indices = self._index.search(query_array, k=min(k, len(self._documents)))
@@ -164,8 +180,12 @@ class FAISSStore:
 
     def clear(self):
         """Clear all documents."""
-        import faiss
-        self._index = faiss.IndexFlatIP(self.dim)
+        # Fix Bug 4: consistent import guard
+        try:
+            import faiss as _faiss
+            self._index = _faiss.IndexFlatIP(self.dim)
+        except ImportError:
+            self._index = None
         self._documents = []
         self._doc_id = 0
         self.save()

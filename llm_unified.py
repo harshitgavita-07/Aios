@@ -21,8 +21,12 @@ except ImportError:
     OLLAMA_AVAILABLE = False
     log.warning("Ollama not available. Install with: pip install ollama")
 
+# Fix Bug 7: llm_unified.py is a root-level module, not inside a package,
+# so `from .llm_llamacpp import ...` raises ImportError with
+# "attempted relative import with no known parent package".
+# Changed to an absolute import.
 try:
-    from .llm_llamacpp import LlamaCppClient
+    from llm_llamacpp import LlamaCppClient
     LLAMACPP_AVAILABLE = True
 except ImportError:
     LLAMACPP_AVAILABLE = False
