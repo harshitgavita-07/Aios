@@ -18,7 +18,7 @@ import argparse
 import sys
 import logging
 
-from aios_core import AIOS
+from gstack.aios_core import AIOS
 
 
 def main():
@@ -107,7 +107,7 @@ def main():
 
     # ── List skills ──────────────────────────────────────────────────────
     if args.list_skills:
-        from core.skills import SKILLS
+        from gstack.core.skills import SKILLS
         print("\n── Available gstack Skills ────────────────────")
         for name, skill in sorted(SKILLS.items()):
             print(f"  /{name:25}  {skill.role}: {skill.description}")
