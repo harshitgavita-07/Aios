@@ -301,8 +301,22 @@ Contributions welcome! The AI-native OS paradigm opens many exciting possibiliti
 - Hardware optimizations should benefit all users
 - Documentation updates required for new features
 
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
+
+## AIOS — Local AI Runtime [WIP]
+
+**Status:** Core architecture working (SQLite memory, SoulSync emotion engine, agent orchestration). 
+UI needs polish. Seeking contributors.
+
+**Why this matters:** The same local-first AI memory architecture has been 
+adopted by Y Combinator's president in GBrain. We're building the open-source 
+alternative.
+
+**Contributing:** See [CONTRIBUTING.md] for good first issues.
+
+ 
 ---
 
 ## License
