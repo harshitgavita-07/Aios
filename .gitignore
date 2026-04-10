@@ -29,3 +29,9 @@ Thumbs.db
 *.tmp
 *.temp
 
+# Agent/runtime local state
+.omx/
+
+# Rust build outputs
+target/
+

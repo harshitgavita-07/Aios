@@ -68,5 +68,6 @@ def route_explicit(command: str) -> Optional[str]:
     return the skill name. Otherwise return None.
     """
     clean = command.strip().lstrip("/")
-    from core.skills import SKILLS
+    from .skills import SKILLS
+
     return clean if clean in SKILLS else None

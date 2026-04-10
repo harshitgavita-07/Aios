@@ -68,6 +68,7 @@ def detect() -> dict:
             info["pcie_gen"] = getattr(top, "pcie_gen", 0)
             info["driver_version"] = getattr(top, "driver_version", "")
             info["features"] = getattr(top, "features", [])
+            info["recommended_llamacpp_backend"] = _get_recommended_llamacpp_backend(info)
             return info
     except Exception:
         pass
@@ -164,7 +165,7 @@ def recommend_gguf_model(hw: dict, available_models: list[str], backend: str = "
     budget = max(budget, 2.0)
 
     for max_memory, preferred in _GGUF_MODEL_TIERS:
-        if budget >= max_memory:
+        if budget <= max_memory:
             for model_name in preferred:
                 if model_name in available_models:
                     return model_name

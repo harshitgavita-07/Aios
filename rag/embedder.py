@@ -43,10 +43,21 @@ class LocalEmbedder:
         """Load the embedding model."""
         try:
             from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self.model_name)
+
+            self._model = SentenceTransformer(
+                self.model_name,
+                local_files_only=True,
+            )
             log.info(f"Loaded embedding model: {self.model_name}")
         except ImportError:
             log.warning("sentence_transformers not installed, using fallback")
+            self._model = None
+        except Exception as e:
+            log.warning(
+                "Embedding model %s is unavailable locally, using fallback: %s",
+                self.model_name,
+                e,
+            )
             self._model = None
 
     def embed(self, texts: List[str]) -> List[List[float]]:

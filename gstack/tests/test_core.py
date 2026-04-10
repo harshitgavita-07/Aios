@@ -3,15 +3,15 @@ tests/test_core.py — unit tests for router, skills, memory.
 No Ollama required — tests the pure-Python logic only.
 """
 
-import sys, os, json, tempfile, pathlib
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import tempfile
+import pathlib
 
 import unittest
 
 
 class TestRouter(unittest.TestCase):
     def setUp(self):
-        from core.router import route, route_explicit
+        from gstack.core.router import route, route_explicit
         self.route = route
         self.route_explicit = route_explicit
 
@@ -53,7 +53,7 @@ class TestRouter(unittest.TestCase):
 
 class TestSkills(unittest.TestCase):
     def setUp(self):
-        from core.skills import get_skill, list_skills
+        from gstack.core.skills import get_skill, list_skills
         self.get_skill = get_skill
         self.list_skills = list_skills
 
@@ -88,7 +88,7 @@ class TestSkills(unittest.TestCase):
 class TestMemory(unittest.TestCase):
     def setUp(self):
         # Redirect memory to temp dir for tests
-        import core.memory as mem
+        import gstack.core.memory as mem
         self._mem = mem
         self._orig_file = mem._MEMORY_FILE
         self._tmpdir = tempfile.mkdtemp()
