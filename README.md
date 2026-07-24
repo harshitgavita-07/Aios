@@ -14,9 +14,6 @@
 [![Node](https://img.shields.io/badge/node-18+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ec4899?style=flat-square)](CONTRIBUTING.md)
 
-
-
-
 **[🚀 Quick Start](#-quick-start)** • **[🏗 Architecture](#-architecture)** • **[💡 Examples](#-usage-examples)** • **[🛣 Roadmap](#-roadmap)** • **[🤝 Contribute](#-contributing)**
 
 </sub>
@@ -30,6 +27,7 @@
 You don't need another chat window that "helps" you write code you then have to babysit line by line.
 
 You need a teammate that:
+
 - Actually **understands** what you meant, not just what you typed
 - **Plans** the whole workflow instead of one shaky step at a time
 - **Executes** — real files, real terminals, real git, real browsers
@@ -88,6 +86,7 @@ That's not a chatbot. That's a **digital coworker**. That's AIOS.
 ## ✨ Feature Drop
 
 ### 🧭 Digital Coworker Core
+
 - **Intent Understanding** — natural language → domain-classified action
 - **Workflow Planning** — template-driven plans for real engineering tasks
 - **Verification-First** — success is *proven*, not assumed
@@ -95,6 +94,7 @@ That's not a chatbot. That's a **digital coworker**. That's AIOS.
 - **Approval Gates** — human-in-the-loop for anything high-stakes
 
 ### ⚙️ Engineering Superpowers
+
 - 📦 **Repo Ops** — clone, branch, merge, resolve conflicts
 - 🔀 **Git Workflows** — commit, push, pull, diff, tag, release
 - 🧪 **Dev Loop** — test, lint, format, build, run dev server
@@ -104,6 +104,7 @@ That's not a chatbot. That's a **digital coworker**. That's AIOS.
 - 🚢 **Ship It** — build, package, deploy, verify, roll back if it breaks
 
 ### 🔌 A Real Plugin Platform
+
 Browser automation (Playwright) · Filesystem · Terminal · Git/GitHub · Docker/Kubernetes · Email · Calendar · Slack · Notion · Linear — and it's built to grow.
 
 ---
@@ -111,6 +112,7 @@ Browser automation (Playwright) · Filesystem · Terminal · Git/GitHub · Docke
 ## 📦 Quick Start
 
 ### Requirements
+
 - Python 3.10+
 - Node.js 18+ (for SCR Runtime)
 - Playwright browsers
@@ -252,6 +254,7 @@ class MyPlugin:
 ## 🛣️ Roadmap
 
 **Phase 1 — v1.0.0-beta** ✅ *Shipped*
+
 - [x] Intent Engine
 - [x] Planning Engine
 - [x] Verification Engine
@@ -259,12 +262,14 @@ class MyPlugin:
 - [x] Workflow templates
 
 **Phase 2 — v1.1.0** 🚧 *In progress*
+
 - [ ] Memory & Context Engine
 - [ ] Workspace & Session Manager
 - [ ] Multi-Agent Coordination
 - [ ] Proactive Coworker features
 
 **Phase 3 — v1.2.0** 🔮 *Coming up*
+
 - [ ] Plugin Marketplace
 - [ ] Automation Library
 - [ ] Advanced Decision Engine
