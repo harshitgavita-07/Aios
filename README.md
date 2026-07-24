@@ -133,7 +133,8 @@ pip install -r requirements.txt
 npm install @scr-runtime/runtime
 
 # Install Playwright browsers
-playwright install chromium
+pip install playwright
+python -m playwright install chromium
 
 # Launch AIOS
 python app.py
