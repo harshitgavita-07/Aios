@@ -1,5 +1,6 @@
 <div align="center">
 # 🧠 AIOS
+ 
 ### The AI-Native Operating System for People Who Are Done Babysitting Their Tools
  
 **Stop prompting. Start delegating.**
