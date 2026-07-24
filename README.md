@@ -2,13 +2,16 @@
 
 <h1 style="font-size: 96px; margin-bottom: 0; line-height: 1;">🧠 AIOS</h1>
 
-<sub>
+<br>
+
 ### The AI-Native Operating System for People Who Are Done Babysitting Their Tools
 
-<div >
-**Stop prompting. Start delegating.**
-</div>
-<div> 
+<br>
+
+> ### 🔥 **Stop prompting. Start delegating.** 🔥
+
+<br><br>
+
 [![Version](https://img.shields.io/badge/version-v1.0.0--beta-6366f1?style=flat-square)](https://github.com/harshitgavita-07/Aios)
 [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
@@ -16,8 +19,6 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ec4899?style=flat-square)](CONTRIBUTING.md)
 
 **[🚀 Quick Start](#-quick-start)** • **[🏗 Architecture](#-architecture)** • **[💡 Examples](#-usage-examples)** • **[🛣 Roadmap](#-roadmap)** • **[🤝 Contribute](#-contributing)**
-</div>
-</sub>
 
 </div>
 
