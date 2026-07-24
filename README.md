@@ -1,18 +1,20 @@
 <div align="center">
-# 🧠 AIOS
+<h1 style="font-size: 72px; margin-bottom: 0;">🧠 AIOS</h1>
  
+<sub>
 ### The AI-Native Operating System for People Who Are Done Babysitting Their Tools
  
 **Stop prompting. Start delegating.**
  
-[![Version](https://img.shields.io/badge/version-v1.0.0--beta-6366f1?style=for-the-badge)](https://github.com/harshitgavita-07/Aios)
-[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e?style=for-the-badge)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Node](https://img.shields.io/badge/node-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ec4899?style=for-the-badge)](CONTRIBUTING.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0--beta-6366f1?style=flat-square)](https://github.com/harshitgavita-07/Aios)
+[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Node](https://img.shields.io/badge/node-18+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ec4899?style=flat-square)](CONTRIBUTING.md)
  
 **[🚀 Quick Start](#-quick-start)** • **[🏗 Architecture](#-architecture)** • **[💡 Examples](#-usage-examples)** • **[🛣 Roadmap](#-roadmap)** • **[🤝 Contribute](#-contributing)**
  
+</sub>
 </div>
 ---
  
