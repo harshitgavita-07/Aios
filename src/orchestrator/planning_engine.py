@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional
 from ..shared.types import (
     Intent,
+    IntentDomain,
     ExecutionPlan,
     TaskStep,
     TaskStatus,
