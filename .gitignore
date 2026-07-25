@@ -35,3 +35,7 @@ Thumbs.db
 # Rust build outputs
 target/
 
+# Node (SCR Runtime local dependency)
+node_modules/
+package-lock.json
+

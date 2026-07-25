@@ -1,0 +1,13 @@
+{
+  "name": "aios",
+  "private": true,
+  "version": "0.0.0",
+  "description": "AIOS orchestration layer -- Node-side dependency manifest for the SCR Runtime adapter.",
+  "type": "module",
+  "dependencies": {
+    "@scr-runtime/runtime": "file:../SCR"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
