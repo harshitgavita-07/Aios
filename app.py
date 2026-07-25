@@ -1,30 +1,29 @@
 """
-AIOS — Unified Entry Point
-AI-Native Operating Environment
+AIOS -- Application Bootstrap
 
-Covers all versions and all modes in one file:
-  - legacy  : v2 chat interface with floating bubble + full tool setup
-  - workspace: v3 AI-native workspace with agent mesh, workflow engine,
-               intent engine, and multi-agent orchestration
+This replaces the pre-PR-#22 entry point, which imported
+`runtime.aios_runtime` and a `core/`/`tools/`/`ui/`/`gstack/` layer that
+no longer exists in this repository (removed in 5b9a380, "Feature/aios
+v1 beta (#22)"). See repository history for details -- that code is
+kept only as historical reference and is not restored here.
 
-Usage
------
-    python app.py                    # workspace mode (default — v3)
-    python app.py --mode legacy      # classic chat interface (v2)
-    python app.py --mode workspace   # explicit workspace mode
-    python app.py --help
+Current architecture:
 
-Architecture this file connects
---------------------------------
-    app.py
-      ├── core/           agent, memory, soulsync, planner, llm,
-      │                   mode_controller, confidence, context_manager
-      ├── rag/            embedder, vector_store, retriever, pipeline,
-      │                   web_search, processor
-      ├── tools/          executor, registry, system_tools, think_tool
-      ├── gstack/         aios_core, aios_gstack, core/*  (skills, router)
-      ├── runtime/        aios_runtime  (AgentMesh, WorkflowEngine, etc.)
-      └── ui/             chat_ui, workspace, bubble, worker
+    AIOS (this process)                     SCR Runtime (Node subprocess)
+    ----------------------------------       ------------------------------
+    IntentEngine    -> parses a goal
+    PlanningEngine  -> builds an ExecutionPlan
+    VerificationEngine -> checks the result   TerminalTarget.run(command)
+                                               (real child_process execution)
+
+    AIOS coordinates. SCR Runtime executes. Nothing here spawns a shell,
+    a browser, or touches the filesystem directly -- that all happens
+    inside SCR Runtime, via src/adapters/scr_adapter.py.
+
+This is intentionally the smallest possible vertical slice: it proves
+Intent -> Planning -> SCR Runtime -> Execution -> Verification -> Result
+end to end. No workspace, UI, memory, or storage layer exists yet --
+those are separate, later milestones.
 """
 
 from __future__ import annotations
@@ -32,13 +31,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-from pathlib import Path
-from typing import Optional
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt, QTimer
-
-# ── Logging ───────────────────────────────────────────────────────────────
+from src import IntentEngine, PlanningEngine, VerificationEngine
+from src.shared.types import ActionResult
+from src.adapters import ScrRuntimeAdapter, ScrRuntimeError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,192 +44,76 @@ logging.basicConfig(
 log = logging.getLogger("aios")
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────
-
-def _has_qt_asyncio() -> bool:
-    """PySide6.QtAsyncio is available from Qt 6.6+."""
-    try:
-        import PySide6.QtAsyncio  # noqa: F401
-        return True
-    except ImportError:
-        return False
+def _working_directory_command() -> str:
+    """The real shell command for 'print the working directory', per OS."""
+    return "cd" if sys.platform == "win32" else "pwd"
 
 
-def _setup_tools(agent) -> None:
-    """
-    Register all whitelisted system tools with the agent's ToolExecutor.
-
-    Connected modules: tools/executor.py, tools/system_tools.py
-    Why needed: The tool whitelist in tools/registry.py gates execution;
-                tools must be registered under the exact whitelisted key.
-    """
-    from tools.executor import ToolExecutor
-    from tools.system_tools import SystemTools
-
-    executor = ToolExecutor()
-    system_tools = SystemTools()
-
-    registered = 0
-    for name, handler in system_tools.get_tools_dict().items():
-        executor.register_tool(name, handler, whitelisted=True)
-        registered += 1
-
-    agent.set_tool_executor(executor)
-    log.info("Registered %d whitelisted tools", registered)
-
-
-# ── Legacy mode (v2 chat interface) ──────────────────────────────────────
-
-def _run_legacy(qt_app: QApplication) -> None:
-    """
-    Initialize and show the v2 chat interface.
-
-    Connected modules:
-        core/agent.py     → AgentController (memory + soulsync + llm + rag)
-        ui/chat_ui.py     → ChatWindow (streaming UI with thinking steps)
-        ui/bubble.py      → FloatingBubble (always-on-top quick access)
-        tools/*           → ToolExecutor + SystemTools (all system tools)
-        rag/*             → RAGPipeline (web search + FAISS vector store)
-    """
+async def main() -> int:
     log.info("=" * 60)
-    log.info("AIOS v2/v3 — Legacy Chat Mode")
+    log.info("AIOS -- orchestrator + SCR Runtime vertical slice")
     log.info("=" * 60)
 
-    from core.agent import AgentController
-    from ui.chat_ui import ChatWindow
-    from ui.bubble import FloatingBubble
+    # -- Orchestration layer: AIOS decides what to do --------------------
+    intent_engine = IntentEngine()
+    planning_engine = PlanningEngine()
+    verification_engine = VerificationEngine()
 
-    data_dir = Path(__file__).parent / "data"
-
-    try:
-        agent = AgentController(data_dir)
-    except Exception as exc:
-        log.error("AgentController init failed: %s", exc)
-        sys.exit(1)
-
-    _setup_tools(agent)
-
-    chat_window = ChatWindow(agent)
-
-    def _show_chat() -> None:
-        chat_window.show()
-        chat_window.raise_()
-        chat_window.activateWindow()
-
-    bubble = FloatingBubble(on_activate=_show_chat)
-    bubble.show()
-
-    log.info("AIOS legacy mode ready — Qt event loop starting")
-    sys.exit(qt_app.exec())
-
-
-# ── Workspace mode (v3 AI-native OS) ─────────────────────────────────────
-
-async def _init_workspace(qt_app: QApplication) -> None:
-    """
-    Initialize the v3 AI-native workspace.
-
-    Connected modules:
-        runtime/aios_runtime.py → AIOSRuntime (AgentMesh, WorkflowEngine,
-                                   IntentEngine, ContextEngine, ResourceManager)
-        ui/workspace.py         → WorkspaceManager + AIOSWorkspace
-        core/agent.py           → AgentController (registered as core agent)
-        tools/*                 → via AgentController
-    """
-    log.info("=" * 60)
-    log.info("AIOS v3 — AI-Native Workspace Mode")
-    log.info("=" * 60)
-
-    from runtime.aios_runtime import init_runtime, shutdown_runtime
-    from ui.workspace import WorkspaceManager
-
-    try:
-        runtime = await init_runtime()
-    except Exception as exc:
-        log.error("Runtime init failed: %s — falling back to legacy mode", exc)
-        _run_legacy(qt_app)
-        return
-
-    # Also set up tools on the core agent so workspace agents can use them
-    if runtime.core_agent and runtime.core_agent.controller:
-        try:
-            _setup_tools(runtime.core_agent.controller)
-        except Exception as exc:
-            log.warning("Tool setup on core agent failed: %s", exc)
-
-    workspace_manager = WorkspaceManager(runtime)
-    workspace_manager.create_workspace()
-    workspace_manager.show_workspace()
-
-    log.info("AIOS workspace ready — Qt event loop starting")
-
-    try:
-        sys.exit(qt_app.exec())
-    finally:
-        await shutdown_runtime()
-
-
-# ── Application bootstrap ─────────────────────────────────────────────────
-
-def _build_qt_app() -> QApplication:
-    app = QApplication(sys.argv)
-    app.setApplicationName("AIOS")
-    app.setApplicationVersion("3.0.0")
-    app.setApplicationDisplayName("AIOS — AI-Native Operating Environment")
-    app.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    intent = intent_engine.parse(
+        "run a terminal command to show the current working directory"
     )
-    return app
+    plan = planning_engine.create_plan(intent)
+    log.info(
+        "Intent parsed: domain=%s confidence=%.2f -- plan has %d step(s)",
+        intent.domain.value,
+        intent.confidence,
+        len(plan.steps),
+    )
 
+    # -- Execution layer: SCR Runtime does the real work -----------------
+    scr = ScrRuntimeAdapter()
+    exit_code = 0
+    try:
+        await scr.start()
 
-def main() -> None:
-    """
-    Unified AIOS entry point.
+        command = _working_directory_command()
+        outcome = await scr.run_terminal_command(command)
+        log.info(
+            "SCR Runtime executed '%s' -> exit=%s (%dms)",
+            outcome["command"],
+            outcome["exitCode"],
+            outcome["durationMs"],
+        )
 
-    Parses --mode flag and boots the appropriate runtime:
-      - workspace (default): v3 AI-native OS with agent mesh
-      - legacy             : v2 chat interface with tool execution
-    """
-    mode = "workspace"
-    if "--mode" in sys.argv:
-        idx = sys.argv.index("--mode")
-        if idx + 1 < len(sys.argv):
-            mode = sys.argv[idx + 1]
-    elif "--legacy" in sys.argv or "-l" in sys.argv:
-        mode = "legacy"
+        # -- Verification layer: AIOS checks the real result -------------
+        action_result = ActionResult(
+            action_id=plan.steps[0].id if plan.steps else "adhoc-terminal-check",
+            success=outcome["exitCode"] == 0,
+            data=outcome,
+            duration_ms=outcome["durationMs"],
+        )
+        verification = verification_engine.verify(
+            action_result,
+            expected={"exitCode": 0},
+        )
 
-    if mode not in ("workspace", "legacy"):
-        print(f"Unknown mode '{mode}'. Use: workspace | legacy", file=sys.stderr)
-        sys.exit(1)
+        print(f"stdout: {outcome['stdout'].strip()}")
+        print(f"stderr: {outcome['stderr'].strip()}")
+        print(f"exit code: {outcome['exitCode']}")
+        print(f"verified: {verification.success} (confidence={verification.confidence:.2f})")
 
-    qt_app = _build_qt_app()
+        if not verification.success:
+            exit_code = 1
 
-    if mode == "legacy":
-        _run_legacy(qt_app)
-        return  # sys.exit called inside
+    except ScrRuntimeError as exc:
+        log.error("SCR Runtime unavailable: %s", exc)
+        exit_code = 1
+    finally:
+        await scr.shutdown()
 
-    # Workspace mode — needs asyncio
-    if _has_qt_asyncio():
-        # Qt 6.6+: QtAsyncio manages the event loop natively
-        import PySide6.QtAsyncio as QtAsyncio
-
-        async def _boot():
-            await _init_workspace(qt_app)
-
-        try:
-            asyncio.run(_boot())
-        except KeyboardInterrupt:
-            log.info("Interrupted")
-    else:
-        # Older Qt: init async, then hand off to Qt event loop
-        try:
-            asyncio.run(_init_workspace(qt_app))
-        except KeyboardInterrupt:
-            log.info("Interrupted")
-        except Exception as exc:
-            log.error("Startup error: %s", exc, exc_info=True)
-            sys.exit(1)
+    log.info("AIOS shutdown complete")
+    return exit_code
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(asyncio.run(main()))

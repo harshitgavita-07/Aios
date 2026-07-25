@@ -129,8 +129,9 @@ cd Aios
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Install SCR Runtime
-npm install @scr-runtime/runtime
+# Install SCR Runtime (developed locally alongside AIOS -- see package.json;
+# requires a sibling checkout at ../SCR with `npm run build` already run there)
+npm install
 
 # Install Playwright browsers
 pip install playwright
