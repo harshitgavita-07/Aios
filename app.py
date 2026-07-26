@@ -8,7 +8,7 @@ the real orchestration pipeline:
         -> IntentEngine          (src/orchestrator/intent_engine.py)
         -> PlanningEngine        (src/orchestrator/planning_engine.py)
         -> PlanExecutor          (src/execution/plan_executor.py)
-        -> ScrRuntimeAdapter     (src/adapters/scr_adapter.py)
+        -> RuntimeAdapter        (src/adapters/runtime_adapter.py)
         -> SCR Runtime           (Node subprocess, real terminal execution)
         -> VerificationEngine    (src/orchestrator/verification_engine.py)
         -> GUI (this file)
@@ -28,8 +28,8 @@ command. PlanExecutor and the UI both surface that failure honestly
 (a real, red, "command not found"-style error) rather than hiding or
 faking success. Only the "terminal" plugin has an execution backend at
 all right now (browser/git/docker/etc. plans are recognized and shown,
-but PlanExecutor reports them as not-yet-implemented instead of
-pretending to run them -- see PlanExecutor.SUPPORTED_PLUGINS).
+but RuntimeAdapter reports them as not-yet-implemented instead of
+pretending to run them -- see RuntimeAdapter.capabilities()).
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ from PySide6.QtWidgets import (
 )
 
 from src import IntentEngine, PlanningEngine, VerificationEngine
-from src.adapters import ScrRuntimeAdapter
+from src.adapters import RuntimeAdapter, ScrRuntimeAdapter
 from src.execution import PlanExecutor
 from src.shared.types import Event
 
@@ -218,7 +218,7 @@ class EventBus(QObject):
 class RuntimeController(QObject):
     """
     Initializes IntentEngine / PlanningEngine / VerificationEngine /
-    PlanExecutor / ScrRuntimeAdapter exactly once and keeps them alive
+    PlanExecutor / RuntimeAdapter exactly once and keeps them alive
     for the process lifetime. Runs its own asyncio loop on a dedicated
     background thread; the GUI thread only ever calls submit_goal(),
     never awaits anything itself.
@@ -239,7 +239,8 @@ class RuntimeController(QObject):
         self.planning_engine = PlanningEngine()
         self.verification_engine = VerificationEngine()
         self.scr_adapter = ScrRuntimeAdapter()
-        self.plan_executor = PlanExecutor(self.scr_adapter, on_event=self._on_executor_event)
+        self.runtime_adapter = RuntimeAdapter(self.scr_adapter)
+        self.plan_executor = PlanExecutor(self.runtime_adapter, on_event=self._on_executor_event)
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -258,7 +259,7 @@ class RuntimeController(QObject):
         """Stops SCR Runtime and the background loop. Blocks briefly."""
         if self._loop is None:
             return
-        future = asyncio.run_coroutine_threadsafe(self.scr_adapter.shutdown(), self._loop)
+        future = asyncio.run_coroutine_threadsafe(self.runtime_adapter.shutdown(), self._loop)
         try:
             future.result(timeout=8)
         except Exception as exc:  # noqa: BLE001 -- shutdown must never raise into caller
@@ -294,7 +295,7 @@ class RuntimeController(QObject):
             self._loop.close()
 
     async def _async_start(self) -> None:
-        await self.scr_adapter.start()
+        await self.runtime_adapter.start()
 
     def _handle_start_result(self, future: "asyncio.Future[None]") -> None:
         exc = future.exception()

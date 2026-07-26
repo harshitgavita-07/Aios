@@ -8,8 +8,10 @@ Runtime, via scr_adapter.ScrRuntimeAdapter.
 """
 
 from .scr_adapter import ScrRuntimeAdapter, ScrRuntimeError
+from .runtime_adapter import RuntimeAdapter
 
 __all__ = [
     "ScrRuntimeAdapter",
     "ScrRuntimeError",
+    "RuntimeAdapter",
 ]

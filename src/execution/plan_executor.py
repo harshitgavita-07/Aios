@@ -1,18 +1,18 @@
 """
 Plan Executor for AIOS.
 
-Walks an ExecutionPlan's steps and dispatches each one to the correct
-execution backend via ScrRuntimeAdapter. This is the piece that was
-previously missing: app.py used to hardcode a single command instead
-of consulting a real plan.
+Walks an ExecutionPlan's steps in dependency order and delegates each
+one to RuntimeAdapter -- the single execution boundary. PlanExecutor
+itself no longer knows anything about plugins, backends, or SCR
+Runtime: it only sequences steps, tracks dependency-driven skips, and
+turns each step into an Event for observability.
 
-Only plugins with a real, working backend are executed. Everything
-else fails loudly with a clear "not implemented" error rather than
-faking success -- there is currently exactly one real backend
-(SCR Runtime's terminal target, via ScrRuntimeAdapter.run_terminal_command).
-Browser/git/docker/etc. plugins are recognized but not yet wired to
-any SCR target, and PlanExecutor says so explicitly instead of
-pretending otherwise.
+(Refactor note: this used to contain a per-plugin dispatch --
+_execute_step/_execute_terminal_step and a SUPPORTED_PLUGINS set --
+which duplicated logic that now lives in RuntimeAdapter. There were
+never any BrowserPlugin/TerminalPlugin/etc. classes or switch
+statements in this codebase to remove; the only thing to simplify was
+that one small if-branch.)
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import logging
 from datetime import datetime
 from typing import Any, Awaitable, Callable, Optional
 
-from ..adapters import ScrRuntimeAdapter, ScrRuntimeError
+from ..adapters import RuntimeAdapter
 from ..shared.types import ActionResult, Event, ExecutionPlan, TaskStatus, TaskStep
 
 log = logging.getLogger("aios.execution.plan_executor")
@@ -30,11 +30,6 @@ log = logging.getLogger("aios.execution.plan_executor")
 # can be driven from a plain script or from a Qt/asyncio-backed app.
 EventCallback = Callable[[Event], Optional[Awaitable[None]]]
 
-# Plugins with a real execution backend today. Anything else in a plan
-# is a legitimate step the planner produced, but PlanExecutor has
-# nothing real to run it against yet.
-SUPPORTED_PLUGINS = frozenset({"terminal"})
-
 
 class PlanExecutionError(RuntimeError):
     """Raised when a plan cannot be executed at all (not per-step failure)."""
@@ -42,20 +37,21 @@ class PlanExecutionError(RuntimeError):
 
 class PlanExecutor:
     """
-    Executes an ExecutionPlan step by step against real backends.
+    Executes an ExecutionPlan step by step through RuntimeAdapter.
 
-    A step only ever reports success if a real backend actually ran it
-    and returned a real result. Steps whose plugin has no backend yet
-    are marked FAILED with a clear, honest error message -- never
-    SKIPPED-as-if-fine and never fabricated as successful.
+    A step only ever reports success if RuntimeAdapter actually ran it
+    through SCR Runtime and got a real result back. RuntimeAdapter is
+    solely responsible for deciding whether a plugin is supported and
+    for translating steps/results -- PlanExecutor just sequences and
+    observes.
     """
 
     def __init__(
         self,
-        scr_adapter: ScrRuntimeAdapter,
+        runtime_adapter: RuntimeAdapter,
         on_event: Optional[EventCallback] = None,
     ) -> None:
-        self._scr = scr_adapter
+        self._runtime = runtime_adapter
         self._on_event = on_event
 
     async def execute(self, plan: ExecutionPlan) -> list[ActionResult]:
@@ -85,13 +81,19 @@ class PlanExecutor:
                 )
                 continue
 
-            result = await self._execute_step(step)
+            step.status = TaskStatus.RUNNING
+            step.started_at = datetime.now()
+            log.info("Dispatching step id=%s plugin=%s action=%s", step.id, step.plugin, step.action)
+
+            result = await self._runtime.execute(step)
+            step.completed_at = datetime.now()
             results.append(result)
 
             if result.success:
                 completed_ids.add(step.id)
             else:
                 failed_ids.add(step.id)
+                log.warning("Step %s did not succeed: %s", step.id, result.error)
 
             await self._emit(
                 "ExecutionProgress",
@@ -108,58 +110,6 @@ class PlanExecutor:
             },
         )
         return results
-
-    async def _execute_step(self, step: TaskStep) -> ActionResult:
-        step.status = TaskStatus.RUNNING
-        step.started_at = datetime.now()
-
-        if step.plugin not in SUPPORTED_PLUGINS:
-            step.status = TaskStatus.FAILED
-            step.error = (
-                f"Plugin '{step.plugin}' has no execution backend yet. "
-                f"Only {sorted(SUPPORTED_PLUGINS)} are currently wired to SCR Runtime."
-            )
-            step.completed_at = datetime.now()
-            log.warning("Step %s not executed: %s", step.id, step.error)
-            return ActionResult(action_id=step.id, success=False, error=step.error)
-
-        if step.plugin == "terminal":
-            return await self._execute_terminal_step(step)
-
-        # Unreachable given SUPPORTED_PLUGINS, but keeps the branch honest
-        # rather than silently falling through.
-        raise PlanExecutionError(f"No dispatch implemented for plugin '{step.plugin}'")
-
-    async def _execute_terminal_step(self, step: TaskStep) -> ActionResult:
-        command = step.parameters.get("command")
-        if not command:
-            step.status = TaskStatus.FAILED
-            step.error = "Terminal step has no 'command' parameter"
-            step.completed_at = datetime.now()
-            return ActionResult(action_id=step.id, success=False, error=step.error)
-
-        try:
-            outcome: dict[str, Any] = await self._scr.run_terminal_command(command)
-        except ScrRuntimeError as exc:
-            step.status = TaskStatus.FAILED
-            step.error = str(exc)
-            step.completed_at = datetime.now()
-            log.error("SCR Runtime failed to execute step %s: %s", step.id, exc)
-            return ActionResult(action_id=step.id, success=False, error=step.error)
-
-        success = outcome.get("exitCode") == 0
-        step.status = TaskStatus.COMPLETED if success else TaskStatus.FAILED
-        step.result = outcome
-        step.error = None if success else f"Command exited with code {outcome.get('exitCode')}"
-        step.completed_at = datetime.now()
-
-        return ActionResult(
-            action_id=step.id,
-            success=success,
-            data=outcome,
-            error=step.error,
-            duration_ms=int(outcome.get("durationMs", 0)),
-        )
 
     @staticmethod
     def _ordered(steps: list[TaskStep]) -> list[TaskStep]:
