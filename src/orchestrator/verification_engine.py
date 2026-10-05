@@ -387,7 +387,7 @@ class VerificationEngine:
         step: Optional[TaskStep]
     ) -> dict[str, Any]:
         """Verify expected side effects occurred."""
-        side_effects = result.data.get("side_effects", {})
+        side_effects = (result.data or {}).get("side_effects", {})
         
         for key, expected_value in expected.items():
             if key.startswith("side_effect_"):
