@@ -5,6 +5,7 @@ Independently verifies execution results before reporting success,
 ensuring AIOS never claims success without evidence.
 """
 
+import os
 import time
 from datetime import datetime
 from typing import Any, Optional, Callable
@@ -403,12 +404,13 @@ class VerificationEngine:
         expected: dict[str, Any],
         step: Optional[TaskStep]
     ) -> dict[str, Any]:
-        """Verify directory was created."""
-        path = expected.get("path", "")
-        exists = result.data.get("exists", False) if result.data else False
-        
-        return {"success": exists, "evidence": {"path": path, "exists": exists}}
-    
+        """Verify the directory exists ON DISK. What the agent reported is ignored."""
+        path = self._disk_path(expected)
+        if path is None:
+            return self._no_path()
+        exists = os.path.isdir(path)
+        return {"success": exists, "evidence": {"path": path, "exists": exists, "verified_on_disk": True}}
+
     def _verify_git_remote(
         self,
         result: ActionResult,
@@ -449,46 +451,70 @@ class VerificationEngine:
         
         return {"success": success, "evidence": {"version": version}}
     
+    @staticmethod
+    def _disk_path(expected: dict[str, Any]) -> Optional[str]:
+        """Path to check on disk, or None when the caller gave no path."""
+        path = expected.get("path")
+        if not path or not isinstance(path, str):
+            return None
+        return os.path.expanduser(path)
+
+    @staticmethod
+    def _no_path() -> dict[str, Any]:
+        # Fail closed: we will not accept the agent's own claim as proof.
+        return {"success": False, "reason": "no 'path' in expected; cannot check reality",
+                "evidence": {"verified_on_disk": False}}
+
     def _verify_file_exists(
         self,
         result: ActionResult,
         expected: dict[str, Any],
         step: Optional[TaskStep]
     ) -> dict[str, Any]:
-        """Verify file was created."""
-        path = expected.get("path", "")
-        exists = result.data.get("exists", False) if result.data else False
-        
-        return {"success": exists, "evidence": {"path": path, "exists": exists}}
-    
+        """Verify the file exists ON DISK. What the agent reported is ignored."""
+        path = self._disk_path(expected)
+        if path is None:
+            return self._no_path()
+        exists = os.path.isfile(path)
+        return {"success": exists, "evidence": {"path": path, "exists": exists, "verified_on_disk": True}}
+
     def _verify_file_missing(
         self,
         result: ActionResult,
         expected: dict[str, Any],
         step: Optional[TaskStep]
     ) -> dict[str, Any]:
-        """Verify file was deleted."""
-        path = expected.get("path", "")
-        missing = result.data.get("missing", True) if result.data else True
-        
-        return {"success": missing, "evidence": {"path": path, "missing": missing}}
-    
+        """Verify the file is gone ON DISK. What the agent reported is ignored."""
+        path = self._disk_path(expected)
+        if path is None:
+            return self._no_path()
+        missing = not os.path.exists(path)
+        return {"success": missing, "evidence": {"path": path, "missing": missing, "verified_on_disk": True}}
+
+    MAX_CONTENT_READ = 1_000_000  # bytes; verification never slurps huge files
+
     def _verify_content(
         self,
         result: ActionResult,
         expected: dict[str, Any],
         step: Optional[TaskStep]
     ) -> dict[str, Any]:
-        """Verify file/content matches expectations."""
-        content = result.data.get("content", "") if result.data else ""
-        
+        """Verify file content by reading the file from disk (read-only, size-capped)."""
+        path = self._disk_path(expected)
+        if path is None:
+            return self._no_path()
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read(self.MAX_CONTENT_READ)
+        except OSError as exc:
+            return {"success": False, "reason": f"cannot read {path}: {exc.__class__.__name__}",
+                    "evidence": {"path": path, "verified_on_disk": True}}
         if "content_contains" in expected:
             success = expected["content_contains"] in content
-            return {"success": success, "evidence": {"content": content[:200]}}
-        
-        success = bool(content)
-        return {"success": success, "evidence": {"content": content[:200]}}
-    
+        else:
+            success = bool(content)
+        return {"success": success, "evidence": {"path": path, "content": content[:200], "verified_on_disk": True}}
+
     def _verify_generic(
         self,
         result: ActionResult,
