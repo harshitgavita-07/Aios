@@ -34,16 +34,60 @@ def test_verifier_accepts_run_with_exit_code_zero():
     assert v.checks_performed  # the strategy for "run" actually executed
 
 
-def test_self_reported_exists_is_trusted_by_default_documented_gap():
-    """Documents current behaviour: the built-in file_exists check reads what the agent reported.
-    examples/verified_delegation.py shows how to swap in a disk check with register_verifier."""
-    r = ActionResult(action_id="a", success=True, data={"exists": True})
-    v = VerificationEngine(max_retries=0).verify(r, {"path": "/definitely/not/here"},
-                                                  TaskStep("a", "x", "create"))
-    assert "file_exists" in v.checks_performed
+def _create_step():
+    return TaskStep("a", "x", "create")
 
 
-def test_custom_disk_verifier_catches_false_claim(tmp_path):
+def test_default_file_check_ignores_false_claim(tmp_path):
+    claim = ActionResult(action_id="a", success=True, data={"exists": True, "content": "hello"})
+    v = VerificationEngine(max_retries=0).verify(
+        claim, {"path": str(tmp_path / "nope.txt"), "content_contains": "hello"}, _create_step())
+    assert not v.success and len(v.failures) == 2  # file_exists and content_check both fail
+
+
+def test_default_file_check_passes_on_real_file(tmp_path):
+    f = tmp_path / "ok.txt"; f.write_text("hello world")
+    claim = ActionResult(action_id="a", success=True)  # no self-reported data at all
+    v = VerificationEngine(max_retries=0).verify(
+        claim, {"path": str(f), "content_contains": "hello"}, _create_step())
+    assert v.success and v.evidence["file_exists"]["verified_on_disk"] is True
+
+
+def test_default_content_check_catches_wrong_content(tmp_path):
+    f = tmp_path / "ok.txt"; f.write_text("something else")
+    v = VerificationEngine(max_retries=0).verify(
+        ActionResult(action_id="a", success=True), {"path": str(f), "content_contains": "hello"}, _create_step())
+    assert not v.success and any("content_check" in x for x in v.failures)
+
+
+def test_file_check_fails_closed_without_path():
+    claim = ActionResult(action_id="a", success=True, data={"exists": True})
+    v = VerificationEngine(max_retries=0).verify(claim, {}, _create_step())
+    assert not v.success  # an agent's own claim is never proof
+
+
+def test_delete_verified_on_disk(tmp_path):
+    f = tmp_path / "gone.txt"
+    step = TaskStep("a", "x", "delete")
+    claim = ActionResult(action_id="a", success=True, data={"missing": True})
+    eng = VerificationEngine(max_retries=0)
+    f.write_text("still here")
+    assert not eng.verify(claim, {"path": str(f)}, step).success  # claim says gone, file exists
+    f.unlink()
+    assert eng.verify(claim, {"path": str(f)}, step).success
+
+
+def test_directory_verified_on_disk(tmp_path):
+    d = tmp_path / "d"
+    step = TaskStep("a", "x", "clone")
+    claim = ActionResult(action_id="a", success=True, data={"exists": True})
+    eng = VerificationEngine(max_retries=0)
+    assert not eng.verify(claim, {"path": str(d)}, step).success
+    d.mkdir()
+    assert "directory_exists" in eng.verify(claim, {"path": str(d)}, step).evidence
+
+
+def test_custom_verifier_can_still_override_default(tmp_path):
     eng = VerificationEngine(max_retries=0)
     eng.register_verifier("file_exists", lambda r, e: os.path.isfile(e["path"]))
     eng.register_verifier("content_check", lambda r, e: os.path.isfile(e["path"]))
