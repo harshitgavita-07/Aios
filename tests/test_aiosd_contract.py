@@ -1,3 +1,11 @@
+import pytest
+
+pytest.skip(
+    "Legacy contract test: targets modules (os/userspace, rag, hardware) that were removed in the "
+    "v1-beta refactor (see git history before 8a485df). Skipped on purpose, not deleted.",
+    allow_module_level=True,
+)
+
 import importlib.util
 import json
 import sys
