@@ -154,8 +154,10 @@ python -m pytest                         # core tests: intent -> plan -> execute
 pure Python and tested. Real execution currently goes through the SCR Runtime for `terminal`
 steps only; other plugins return an honest "no backend yet" failure. The desktop app
 (`app.py`) additionally needs PySide6 and a local `../SCR` build.
-Note: the built-in `file_exists` / `content_check` verifiers read what the agent reported; the
-example shows how to register a verifier that checks the disk itself.
+The built-in file checks (`file_exists`, `file_missing`, `content_check`, `directory_exists`) look at the
+real disk using the `path` you pass in `expected`, and ignore what the agent reported. With no `path`
+they fail closed. Other checks (URL, title, exit code, ...) still read the result data the runtime
+returns, and you can replace any check with `register_verifier`.
 
 That's it. Welcome to your new coworker.
 
