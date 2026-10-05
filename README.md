@@ -141,6 +141,22 @@ python -m playwright install chromium
 python app.py
 ```
 
+### Try the core in 60 seconds (no GUI, no model, no Node)
+
+```bash
+git clone https://github.com/harshitgavita-07/Aios.git && cd Aios
+pip install pytest
+python examples/verified_delegation.py   # an agent claims "done"; AIOS checks the disk and catches it
+python -m pytest                         # core tests: intent -> plan -> execute -> verify
+```
+
+**What is real today:** the intent, planning and verification engines and the plan executor are
+pure Python and tested. Real execution currently goes through the SCR Runtime for `terminal`
+steps only; other plugins return an honest "no backend yet" failure. The desktop app
+(`app.py`) additionally needs PySide6 and a local `../SCR` build.
+Note: the built-in `file_exists` / `content_check` verifiers read what the agent reported; the
+example shows how to register a verifier that checks the disk itself.
+
 That's it. Welcome to your new coworker.
 
 ---
@@ -204,9 +220,10 @@ No copy-pasting. No "did it actually work?" No babysitting.
 ## 🧪 Testing
 
 ```bash
-pytest tests/                          # unit tests
-pytest tests/test_integration.py       # integration tests
-pytest --cov=src tests/                # with coverage
+python -m pytest                       # core engine tests (tests/test_core_engines.py)
+python examples/verified_delegation.py # runnable demo
+# tests/test_aiosd_contract.py, test_embedder_contract.py, test_hardware_contract.py are skipped:
+# they target modules removed in the v1-beta refactor.
 ```
 
 ---
